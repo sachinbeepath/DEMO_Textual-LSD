@@ -25,7 +25,7 @@ class multitaskNet(nn.Module):
 
     def forward(self, input_ids, token_ids=None, labels=None):
         '''
-        transformer needs to output dimension: BxLxH (sum out the embedding dim)
+        transformer needs to output dimension: BxLxHxE (sum out the embedding dim)
         B = batch size, L = sentence length, H = number of attention heads, E = embedding size
         '''
 
