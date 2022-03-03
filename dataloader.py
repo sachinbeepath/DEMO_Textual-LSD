@@ -5,7 +5,16 @@ from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize
 from nltk.corpus import words as ws
 import spacy 
+import os
 
+clear = lambda: os.system('cls')
+
+def printc(x):
+    clear()
+    print(x)
+    return
+    
+printc('Loading Data...')
 datafile = pd.read_excel("Data_8500_songs.xlsx")
 df = pd.DataFrame(datafile)
 
@@ -69,11 +78,11 @@ length = 500
 stemmer = PorterStemmer()
 tokenizer = word_tokenize
 
-
-
+printc('Cleaning Data...')
+#This step takes about 15 - 20 seconds
 df['Clean_Lyrics'] = df['lyrics'].apply(lambda x: clean_lyrics(x, char_to_remove, replacement_chars, True, lambda y: stemmer.stem(y), 
                                                                 True, tokenizer, length=length))
 print(df['lyrics'].head())
 print(df['Clean_Lyrics'][0])
 
-
+print('Done')
