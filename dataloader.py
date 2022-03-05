@@ -3,9 +3,10 @@ import numpy as np
 import nltk
 from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize
-from nltk.corpus import words as ws
-import spacy 
+from nltk.corpus import words as ws 
 import os
+import re
+from lyricsScraper import LyricScraper
 
 clear = lambda: os.system('cls')
 
@@ -13,14 +14,23 @@ def printc(x):
     clear()
     print(x)
     return
-    
-printc('Loading Data...')
-datafile = pd.read_excel("Data_8500_songs.xlsx")
-df = pd.DataFrame(datafile)
 
-df = df[['Artist', 'song', 'valence_tags', 'arousal_tags', 'dominance_tags', 'lyrics']]
+printc('Reading in data...')
+df = pd.read_excel('Comparison_2500_songs.xlsx', skiprows=np.arange(0, 15, 1))
+df = pd.DataFrame(df)
+df = df[['Index', 'Artist', 'Title', 'Mood']]
 
-def clean_lyrics(sentence, char_to_remove = [], replacement_chars = [], stem = False, stemmer = None, 
+ls = LyricScraper(df, 'Artist', 'Title', no_lyrics_return='<NoLyrics>', add_to_df=True)
+df = ls.get_df()
+df.to_excel('Comparison_2500_songs_lyrics.xlsx')
+
+#printc('Loading Data...')
+#datafile = pd.read_excel("Data_8500_songs.xlsx")
+#df = pd.DataFrame(datafile)
+#
+#df = df[['Artist', 'song', 'valence_tags', 'arousal_tags', 'dominance_tags', 'lyrics']]
+
+def clean_lyrics(sentence, char_to_remove = [], replacement_chars = [], remove_between_brackets=False, stem = False, stemmer = None, 
                 tokenize = False, tokenizer = None, sep = ' ', length = 100, pad_token = '<PAD>', 
                 start_token = '<SOS>', end_token = '<EOS>'):
     '''
@@ -29,9 +39,10 @@ def clean_lyrics(sentence, char_to_remove = [], replacement_chars = [], stem = F
 
     Parameters
     ---------------
-    sentencec : String - The sentence to be converted
+    sentence : String - The sentence to be converted
     char_to_remove : list<string> - List of characters to be removed from sentence
     replacement_chars : list<string> - What to replace the characters with, i.e. ' ' or ''
+    remove_between_brackets : bool - whether to remove all text between brackets, e.g. (Ooooh, ahhhh), [instrumental section]
     stem : bool - Whether to apply stemming
     stemmer : func - Stemming function to apply
     tokenize : bool - Whether to apply tokenization
@@ -48,6 +59,9 @@ def clean_lyrics(sentence, char_to_remove = [], replacement_chars = [], stem = F
     assert len(char_to_remove) == len(replacement_chars), "Character removal list dimensions do not match"
     assert length > 0, 'Invalid sentence target length'
     assert len(sentence) > 0, 'Invalid sentence input length'
+    
+    if remove_between_brackets:
+        re.sub("[\(\[\{].*?[\)\]\}]", "", sentence)
 
     if char_to_remove != []:
         for remove, replace in zip(char_to_remove, replacement_chars):
@@ -80,9 +94,15 @@ tokenizer = word_tokenize
 
 printc('Cleaning Data...')
 #This step takes about 15 - 20 seconds
-df['Clean_Lyrics'] = df['lyrics'].apply(lambda x: clean_lyrics(x, char_to_remove, replacement_chars, True, lambda y: stemmer.stem(y), 
-                                                                True, tokenizer, length=length))
-print(df['lyrics'].head())
-print(df['Clean_Lyrics'][0])
+df['Clean_Lyrics'] = df['Lyrics'].apply(lambda x: clean_lyrics(x, char_to_remove, replacement_chars, remove_between_brackets=True, 
+                                                                stem=True, stemmer=lambda y: stemmer.stem(y), 
+                                                                tokenize=True, tokenizer=tokenizer, length=length))
 
+printc('Saving Data as Pickle...')
+df.to_pickle('Comparison_2500_songs_cleaned_lyrics.pkl')
 print('Done')
+
+
+
+
+
