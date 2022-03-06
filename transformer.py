@@ -38,9 +38,7 @@ class MultiHeadAttention(nn.Module):
         Y = torch.einsum("nhqk,nkhd->nqhd",[attention,v]).reshape(b,n,self.emb) #(b,n,d)
         
         return self.out(Y)
-    
-    
-    
+
     
 class Transformer(nn.Module):
     def __init__(self,emb,heads=8,dropout=0.0,mult=4):
@@ -51,7 +49,7 @@ class Transformer(nn.Module):
         mult: forward expansion factor
         """
         super(Transformer,self).__init__()
-        
+
         self.attention = MultiHeadAttention(emb,heads)
         self.norm1 = nn.LayerNorm(emb)
         self.norm2 = nn.LayerNorm(emb)
@@ -66,6 +64,52 @@ class Transformer(nn.Module):
         fout = self.fout(y)
         out = self.dropout(self.norm2(fout+y))
         return out
+
+class Encoder(nn.Module):
+    # creating the encoding cell that takes in the transformer
+    def __init__(self,vocab_size, emb_size, num_layers, heads, mult, dropout, maxlength):
+        """
+
+        Parameters
+        ----------
+        vocab_size: the size of the dictionary being inputted
+        emb_size: the size of each embedding vector
+        num_layers
+        heads: number of heads
+        mult: the forward expansion factor
+        dropout:
+        maxlength: relates to the positional embedding, the max length of a sentence we want to include (will depend on our data)
+        """
+        super(Encoder, self).__init__()
+
+        self.emb_size = emb_size
+        # self.device = device
+        self.word_emb = nn.Embedding(vocab_size,emb_size)
+        self.positional_emb = nn.Embedding(maxlength, emb_size)
+
+        self.layers = nn.ModuleList( [ Transformer(emb_size,dropout,mult) ] )
+
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self,x, mask):
+        N, seq_length = x.shape
+
+        positions = torch.arange(0,seq_length).expand(N,seq_length)#.to(device)
+
+        # this will learn how words are structured
+        out = self.dropout(self.word_emb(x) + self.positional_emb(positions))
+
+        for layer in self.layers:
+            # the out out out refer to the value key and query
+            out = layer(out,out,out, mask) # all inputs are the same
+
+        return out
+
+
+
+
+
+
     
     
     
