@@ -14,13 +14,17 @@ from torch.utils.data import dataset
 --------LSD_DataLoader-----------
 
 A custom pytorch dataset class.
-It is used to take in a dataset of song information, 
+It is used to take in a dataset of song information, with minimum of one column
+containing song lyrics. It can then interface with a Pytorch Dataloader class through
+the __len__ and __getitem__ methods. It also as additional functionality in its methods 
+for cleaning lyrics, tokenizing sentences and applying stemming algorithms for 
+NLP preperation.
 
 
 '''
 
 class LSD_DataLoader(dataset):
-    def __init__(self, dataFrame,  lyric_col=None):
+    def __init__(self, dataFrame,  lyric_col, lyric_format = 'string'):
         '''
         DataSet class for a pandas dataframe containing song lyrics.
 
@@ -28,15 +32,21 @@ class LSD_DataLoader(dataset):
         -------------------
         dataFrame : pandas.DataFrame - dataframe object containing at least a lyrics colunn
         lyric_col : string - column title for the lyrics column
+        lyric_format : string - one of "string" or "list". This determines if the lyrics are stored as one continuous string
+                        or as a list of strings with some delimiter character
+                        If set to "list" then character removal, remove_between_brackets and tokenization are automatically skipped
         '''
         super().__init__()
         assert isinstance(dataFrame, pd.DataFrame), 'dataFrame must be a Pandas DataFrame object.'
+        assert lyric_format in ['string', 'list'], 'lyric_format must be in ["string", "list"]'
 
         self.original_df = dataFrame # Kept uneditted in case needed later
         self.df = dataFrame # May be editted my methods within the class
         self.columns = dataFrame.columns # List of column headers
         self.lyric_col = lyric_col
-
+        self.format = lyric_format
+        
+        #Default lists for character replacement/removal
         self.char_to_remove_default = ["'", '\n', '\r', ',', '!', '?', '.', '"', '_x000D_', '(', ')', '[', ']', '_', '-']
         self.replacement_chars_default = ["", ' ', '', '', ' !', ' ?', ' .', '', '', '', '', '', '', '', '']
 
@@ -47,7 +57,25 @@ class LSD_DataLoader(dataset):
     def __getitem__(self, idx):
         return self.df[idx]
 
+    def change_lyric_format(self, delimiter=' '):
+        '''
+        Changes the formatting of lyric column from one string to an array of strings seperated by a 
+        delimiting character, and vice versa, with array elements being joined with the delimiting
+        character.
+
+        delimiter : string - the character used to seperate or join words
+        '''
+        if self.format == 'string':
+            self.df[self.lyric_col].apply(lambda s: s.split(delimiter))
+            self.format = 'list'
+            return
+        elif self.format == 'list':
+            self.df[self.lyric_col].apply(lambda s: delimiter.join(s))
+            self.format = 'string'
+            return
+
     def restore_default_dataframe(self):
+        '''Sets editable dataframe back to original dataframe (as passed in during initialisationg)'''
         self.df = self.original_df
         return
 
@@ -56,6 +84,7 @@ class LSD_DataLoader(dataset):
         Retrieves the dataframe. By default, the editted df is returned. If original is true then the
         unedited version (the one passed in at initialisation) is returned
         '''
+
         if original:
             return self.original_df
         else:
@@ -64,7 +93,6 @@ class LSD_DataLoader(dataset):
     def clean_lyrics(self, char_to_remove = 'Default', replacement_chars = 'Default', remove_between_brackets=False, stem = False, stemmer = None, 
                     tokenize = False, tokenizer = None, sep = ' ', length = 500, pad_token = '<PAD>', 
                     start_token = '<SOS>', end_token = '<EOS>'):
-        
         '''
         Takes the lyrics from the dataframe lyrics column and removes all unwanted characters, converts to lowercase, 
         and can apply stemming and tokenization.
@@ -87,6 +115,7 @@ class LSD_DataLoader(dataset):
         returns a numpy array of words with the selected functions applied.
         If no tokenizing is requested, the words are split by a standard string split on delimeter.
         '''
+
         if char_to_remove == 'Default':
             char_to_remove = self.char_to_remove_default
         if replacement_chars == 'Default':
@@ -104,19 +133,22 @@ class LSD_DataLoader(dataset):
         assert len(char_to_remove) == len(replacement_chars), "Character removal list dimensions do not match"
         assert length > 0, 'Invalid sentence target length'
         assert len(sentence) > 0, 'Invalid sentence input length'
-        
-        if remove_between_brackets:
-            re.sub("[\(\[\{].*?[\)\]\}]", "", sentence)
 
-        if char_to_remove != []:
-            for remove, replace in zip(char_to_remove, replacement_chars):
-                sentence = sentence.replace(remove, replace)
-        sentence = sentence.lower()
+        if self.format == 'string': # Only do character removal and tokenization if lyrics are one string. 
+            if remove_between_brackets:
+                re.sub("[\(\[\{].*?[\)\]\}]", "", sentence)
 
-        if tokenize == False:
-            words = sentence.split(sep)
+            if char_to_remove != []:
+                for remove, replace in zip(char_to_remove, replacement_chars):
+                    sentence = sentence.replace(remove, replace)
+            sentence = sentence.lower()
+
+            if tokenize == False:
+                words = sentence.split(sep)
+            else:
+                words = tokenizer(sentence)
         else:
-            words = tokenizer(sentence)
+            words = sentence 
 
         if len(words) > length:
             sentence = sentence[:length]
