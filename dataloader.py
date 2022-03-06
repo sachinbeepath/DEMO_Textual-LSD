@@ -7,100 +7,133 @@ from nltk.corpus import words as ws
 import os
 import re
 from lyricsScraper import LyricScraper
+import torch
+from torch.utils.data import dataset
 
-clear = lambda: os.system('cls')
+'''
+--------LSD_DataLoader-----------
 
-def printc(x):
-    clear()
-    print(x)
-    return
+A custom pytorch dataset class.
+It is used to take in a dataset of song information, 
 
-printc('Reading in data...')
-df = pd.read_excel('Comparison_2500_songs.xlsx', skiprows=np.arange(0, 15, 1))
-df = pd.DataFrame(df)
-df = df[['Index', 'Artist', 'Title', 'Mood']]
 
-ls = LyricScraper(df, 'Artist', 'Title', no_lyrics_return='<NoLyrics>', add_to_df=True)
-df = ls.get_df()
-df.to_excel('Comparison_2500_songs_lyrics.xlsx')
+'''
 
-#printc('Loading Data...')
-#datafile = pd.read_excel("Data_8500_songs.xlsx")
-#df = pd.DataFrame(datafile)
-#
-#df = df[['Artist', 'song', 'valence_tags', 'arousal_tags', 'dominance_tags', 'lyrics']]
+class LSD_DataLoader(dataset):
+    def __init__(self, dataFrame,  lyric_col=None):
+        '''
+        DataSet class for a pandas dataframe containing song lyrics.
 
-def clean_lyrics(sentence, char_to_remove = [], replacement_chars = [], remove_between_brackets=False, stem = False, stemmer = None, 
-                tokenize = False, tokenizer = None, sep = ' ', length = 100, pad_token = '<PAD>', 
-                start_token = '<SOS>', end_token = '<EOS>'):
-    '''
-    Takes an input sentence and removes all unwanted characters, converts to lowercase, 
-    and can apply stemming and tokenization.
+        Parameters:
+        -------------------
+        dataFrame : pandas.DataFrame - dataframe object containing at least a lyrics colunn
+        lyric_col : string - column title for the lyrics column
+        '''
+        super().__init__()
+        assert isinstance(dataFrame, pd.DataFrame), 'dataFrame must be a Pandas DataFrame object.'
 
-    Parameters
-    ---------------
-    sentence : String - The sentence to be converted
-    char_to_remove : list<string> - List of characters to be removed from sentence
-    replacement_chars : list<string> - What to replace the characters with, i.e. ' ' or ''
-    remove_between_brackets : bool - whether to remove all text between brackets, e.g. (Ooooh, ahhhh), [instrumental section]
-    stem : bool - Whether to apply stemming
-    stemmer : func - Stemming function to apply
-    tokenize : bool - Whether to apply tokenization
-    tokenizer : func - Tokenizing function to apply
-    sep : string - The string delimiter, default is is space
-    length : int - Max lenght of sentences. Short sentences are padded, long sentences cropped. By default set to 100
-    pad_token : string - Padding token
-    start_token : string - Start of sentence token
-    end_token : string - End of sentence token
+        self.original_df = dataFrame # Kept uneditted in case needed later
+        self.df = dataFrame # May be editted my methods within the class
+        self.columns = dataFrame.columns # List of column headers
+        self.lyric_col = lyric_col
 
-    returns a numpy array of words with the selected functions applied.
-    If no tokenizing is requested, the words are split by a standard string split on delimeter.
-    '''
-    assert len(char_to_remove) == len(replacement_chars), "Character removal list dimensions do not match"
-    assert length > 0, 'Invalid sentence target length'
-    assert len(sentence) > 0, 'Invalid sentence input length'
+        self.char_to_remove_default = ["'", '\n', '\r', ',', '!', '?', '.', '"', '_x000D_', '(', ')', '[', ']', '_', '-']
+        self.replacement_chars_default = ["", ' ', '', '', ' !', ' ?', ' .', '', '', '', '', '', '', '', '']
+
+
+    def __len__(self):
+        return len(self.df[self.columns[0]])
     
-    if remove_between_brackets:
-        re.sub("[\(\[\{].*?[\)\]\}]", "", sentence)
+    def __getitem__(self, idx):
+        return self.df[idx]
 
-    if char_to_remove != []:
-        for remove, replace in zip(char_to_remove, replacement_chars):
-            sentence = sentence.replace(remove, replace)
-    sentence = sentence.lower()
+    def restore_default_dataframe(self):
+        self.df = self.original_df
+        return
 
-    if tokenize == False:
-        words = sentence.split(sep)
-    else:
-        words = tokenizer(sentence)
+    def get_dataframe(self, original=False):
+        '''
+        Retrieves the dataframe. By default, the editted df is returned. If original is true then the
+        unedited version (the one passed in at initialisation) is returned
+        '''
+        if original:
+            return self.original_df
+        else:
+            return self.df
 
-    if len(words) > length:
-        sentence = sentence[:length]
-    
-    if stem:
-        words = [stemmer(word) for word in words]
+    def clean_lyrics(self, char_to_remove = 'Default', replacement_chars = 'Default', remove_between_brackets=False, stem = False, stemmer = None, 
+                    tokenize = False, tokenizer = None, sep = ' ', length = 500, pad_token = '<PAD>', 
+                    start_token = '<SOS>', end_token = '<EOS>'):
+        
+        '''
+        Takes the lyrics from the dataframe lyrics column and removes all unwanted characters, converts to lowercase, 
+        and can apply stemming and tokenization.
 
-    while len(words) < length:
-        words.append(pad_token)
-    words.insert(0, start_token)
-    words.append(end_token)
+        Parameters
+        ---------------
+        char_to_remove : list<string> - List of characters to be removed from sentence. If 'Default', applies default list
+        replacement_chars : list<string> - What to replace the characters with, i.e. ' ' or ''. If 'Default', applies default list
+        remove_between_brackets : bool - whether to remove all text between brackets, e.g. (Ooooh, ahhhh), [instrumental section]
+        stem : bool - Whether to apply stemming
+        stemmer : func - Stemming function to apply
+        tokenize : bool - Whether to apply tokenization
+        tokenizer : func - Tokenizing function to apply
+        sep : string - The string delimiter, default is is space
+        length : int - Max lenght of sentences. Short sentences are padded, long sentences cropped. By default set to 100
+        pad_token : string - Padding token
+        start_token : string - Start of sentence token
+        end_token : string - End of sentence token
 
-    return np.array(words)
+        returns a numpy array of words with the selected functions applied.
+        If no tokenizing is requested, the words are split by a standard string split on delimeter.
+        '''
+        if char_to_remove == 'Default':
+            char_to_remove = self.char_to_remove_default
+        if replacement_chars == 'Default':
+            replacement_chars = self.replacement_chars_default
 
-char_to_remove = ["'", '\n', '\r', ',', '!', '?', '.', '"', '_x000D_', '(', ')', '[', ']', '_', '-']
-replacement_chars = ["", ' ', '', '', ' !', ' ?', ' .', '', '', '', '', '', '', '', '']
-length = 500
-stemmer = PorterStemmer()
-tokenizer = word_tokenize
+        self.df[self.lyric_col] = self.df[self.lyric_col].apply(lambda song: self.__clean(song, char_to_remove, replacement_chars, remove_between_brackets, 
+                                                stem, stemmer, tokenize, tokenizer, sep, length, pad_token, 
+                                                start_token, end_token))
+        return
 
-printc('Cleaning Data...')
-#This step takes about 15 - 20 seconds
-df['Clean_Lyrics'] = df['Lyrics'].apply(lambda x: clean_lyrics(x, char_to_remove, replacement_chars, remove_between_brackets=True, 
-                                                                stem=True, stemmer=lambda y: stemmer.stem(y), 
-                                                                tokenize=True, tokenizer=tokenizer, length=length))
+    def __clean(self, sentence, char_to_remove, replacement_chars, remove_between_brackets, stem, stemmer, 
+                    tokenize, tokenizer, sep, length, pad_token, start_token, end_token):
+        # All parameters are the same as self.clean_lyrics, except sentence. This is a string containing the lyrics for one song.
+        
+        assert len(char_to_remove) == len(replacement_chars), "Character removal list dimensions do not match"
+        assert length > 0, 'Invalid sentence target length'
+        assert len(sentence) > 0, 'Invalid sentence input length'
+        
+        if remove_between_brackets:
+            re.sub("[\(\[\{].*?[\)\]\}]", "", sentence)
 
-printc('Saving Data as Pickle...')
-df.to_pickle('Comparison_2500_songs_cleaned_lyrics.pkl')
-print('Done')
+        if char_to_remove != []:
+            for remove, replace in zip(char_to_remove, replacement_chars):
+                sentence = sentence.replace(remove, replace)
+        sentence = sentence.lower()
+
+        if tokenize == False:
+            words = sentence.split(sep)
+        else:
+            words = tokenizer(sentence)
+
+        if len(words) > length:
+            sentence = sentence[:length]
+        
+        if stem:
+            words = [stemmer(word) for word in words]
+
+        while len(words) < length:
+            words.append(pad_token)
+        words.insert(0, start_token)
+        words.append(end_token)
+
+        return np.array(words)
+
+
+
+
 
 
 
