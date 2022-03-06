@@ -53,7 +53,7 @@ class Transformer(nn.Module):
         self.attention = MultiHeadAttention(emb,heads)
         self.norm1 = nn.LayerNorm(emb)
         self.norm2 = nn.LayerNorm(emb)
-        nn.fout = nn.Sequential(nn.Linear(emb,emb*mult),
+        self.fout = nn.Sequential(nn.Linear(emb,emb*mult),
                                 nn.ReLU(),
                                 nn.Linear(emb*mult,emb))
         self.dropout = nn.Dropout(dropout)
@@ -87,11 +87,11 @@ class Encoder(nn.Module):
         self.word_emb = nn.Embedding(vocab_size,emb_size)
         self.positional_emb = nn.Embedding(maxlength, emb_size)
 
-        self.layers = nn.ModuleList( [ Transformer(emb_size,dropout,mult) ] )
+        self.layers = nn.ModuleList([Transformer(emb_size, heads, dropout,mult) for _ in range(num_layers)])
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self,x, mask):
+    def forward(self,x):
         N, seq_length = x.shape
 
         positions = torch.arange(0,seq_length).expand(N,seq_length)#.to(device)
@@ -101,7 +101,7 @@ class Encoder(nn.Module):
 
         for layer in self.layers:
             # the out out out refer to the value key and query
-            out = layer(out,out,out, mask) # all inputs are the same
+            out = layer(out) # all inputs are the same
 
         return out
 

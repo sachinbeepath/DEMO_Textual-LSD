@@ -8,7 +8,7 @@ import os
 import re
 from lyricsScraper import LyricScraper
 import torch
-from torch.utils.data import dataset
+from torch.utils.data import Dataset
 
 '''
 --------LSD_DataLoader-----------
@@ -23,8 +23,8 @@ NLP preperation.
 
 '''
 
-class LSD_DataLoader(dataset):
-    def __init__(self, dataFrame,  lyric_col, lyric_format = 'string'):
+class LSD_DataLoader(Dataset):
+    def __init__(self, dataFrame,  lyric_col, label_cols, lyric_format = 'string'):
         '''
         DataSet class for a pandas dataframe containing song lyrics.
 
@@ -32,6 +32,7 @@ class LSD_DataLoader(dataset):
         -------------------
         dataFrame : pandas.DataFrame - dataframe object containing at least a lyrics colunn
         lyric_col : string - column title for the lyrics column
+        label_cols : list<string> - list of column titles referring to V, A and D values.
         lyric_format : string - one of "string" or "list". This determines if the lyrics are stored as one continuous string
                         or as a list of strings with some delimiter character
                         If set to "list" then character removal, remove_between_brackets and tokenization are automatically skipped
@@ -44,7 +45,9 @@ class LSD_DataLoader(dataset):
         self.df = dataFrame # May be editted my methods within the class
         self.columns = dataFrame.columns # List of column headers
         self.lyric_col = lyric_col
+        self.label_cols = label_cols
         self.format = lyric_format
+        self.length = 500 # make this actually useful
         
         #Default lists for character replacement/removal
         self.char_to_remove_default = ["'", '\n', '\r', ',', '!', '?', '.', '"', '_x000D_', '(', ')', '[', ']', '_', '-']
@@ -55,7 +58,9 @@ class LSD_DataLoader(dataset):
         return len(self.df[self.columns[0]])
     
     def __getitem__(self, idx):
-        return self.df[idx]
+        cols = np.array(self.label_cols)
+        np.insert(cols, 0, self.lyric_col)
+        return {col : self.df[col][idx] for col in cols}
 
     def change_lyric_format(self, delimiter=' '):
         '''
