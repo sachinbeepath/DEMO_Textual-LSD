@@ -25,7 +25,7 @@ NLP preperation.
 '''
 
 class LSD_DataLoader(Dataset):
-    def __init__(self, dataFrame,  lyric_col, label_cols, lyric_format = 'string'):
+    def __init__(self, dataFrame,  lyric_col, label_cols, length, lyric_format = 'string'):
         '''
         DataSet class for a pandas dataframe containing song lyrics.
 
@@ -48,7 +48,7 @@ class LSD_DataLoader(Dataset):
         self.lyric_col = lyric_col
         self.label_cols = label_cols
         self.format = lyric_format
-        self.length = 500 # make this actually useful
+        self.length = length # make this actually useful
         self.vocab = None
         
         #Default lists for character replacement/removal
@@ -60,12 +60,17 @@ class LSD_DataLoader(Dataset):
     
     def __getitem__(self, idx):
         cols = np.array(self.label_cols)
-        out = {col : self.df[col][idx] for col in cols}
-        out[self.lyric_col] = self.vocab.str_to_ind(self.df[self.lyric_col][idx])
+        out = {col : torch.tensor(self.df[col][idx]) for col in cols}
+        out[self.lyric_col] = torch.tensor(self.vocab.str_to_ind(self.df[self.lyric_col][idx]))
         return out
 
     def set_vocab(self, v):
         self.vocab = v
+        return
+
+    def scale_VAD_scores(self, scale, mean):
+        for col in self.label_cols:
+            self.df[col] = self.df[col].apply(lambda x: (x - mean) / scale)
         return
 
     def change_lyric_format(self, delimiter=' '):
@@ -158,11 +163,12 @@ class LSD_DataLoader(Dataset):
                 words = sentence.split(sep)
             else:
                 words = tokenizer(sentence)
+            self.format = 'list'
         else:
             words = sentence 
 
         if len(words) > length:
-            sentence = sentence[:length]
+            words = words[:length]
         
         if stem:
             words = [stemmer(word) for word in words]
@@ -171,7 +177,6 @@ class LSD_DataLoader(Dataset):
             words.append(pad_token)
         words.insert(0, start_token)
         words.append(end_token)
-
         return np.array(words)
 
 

@@ -1,3 +1,6 @@
+from operator import le
+from statistics import mean
+from tabnanny import verbose
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -9,6 +12,8 @@ import time
 import argparse
 import utils
 import os
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
 
 clear = lambda: os.system('cls')
 
@@ -38,16 +43,22 @@ NUM_ENCODER_LAYERS = 1
 FORWARD_XP = 2
 DROPOUT = 0.25
 MAXLENGTH = 200
+MT_HEADS = 4
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-TRAIN_VAL_SPLIT = 0.8   
+TRAIN_VAL_SPLIT = 0.8
+PRINT_STEP = 100
+SAVE_STEP = 50   
 
 ##### Load Data into Dataset#####
 printc(f'Reading in {FILENAME} and creating dataloaders...')
 file = pd.read_excel(FILENAME)
 dataframe = pd.DataFrame(file)
-dataset = dl.LSD_DataLoader(dataframe, 'lyrics', ['valence_tags', 'arousal_tags', 'dominance_tags'])
-dataset.clean_lyrics(length=MAXLENGTH)
+ps = PorterStemmer()
+stemmer = lambda x: ps.stem(x)
+dataset = dl.LSD_DataLoader(dataframe, 'lyrics', ['valence_tags', 'arousal_tags', 'dominance_tags'], MAXLENGTH)
+dataset.scale_VAD_scores(10, 5)
+dataset.clean_lyrics(remove_between_brackets=True, stem=True, stemmer=stemmer, tokenize=True, tokenizer=word_tokenize, length=MAXLENGTH)
 idx = np.arange(0, len(dataset), 1)
 np.random.shuffle(idx)
 
@@ -67,12 +78,13 @@ dataloader_val = DataLoader(dataset_val, batch_size=BATCH_SIZE, shuffle=True)
 
 ##### Prepare Model, Optimizer and Criterion #####
 printc('Creating Models')
-encoder = tr.Encoder(len(english), EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH)
-print('Creating MultiTask')
-multitask = mtn.multitaskNet(encoder, ATTENTION_HEADS, MAXLENGTH, EMBEDDING_SIZE, DROPOUT, USE_DOM).to(DEVICE)
-print('Models Done')
+encoder = tr.Encoder(len(english), EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH+2, DEVICE).to(DEVICE)
+encoder.double()
+multitask = mtn.multitaskNet(encoder, MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, USE_DOM).to(DEVICE)
+multitask.double()
 
 adam = optim.Adam(multitask.parameters(), lr=LR) # Fine tune this hypPs...
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.1, patience=0.19, verbose=True)
 
 valence_L = nn.MSELoss()
 arousal_L = nn.MSELoss()
@@ -83,12 +95,12 @@ losses = []
 for epoch in range(EPOCHS):
     print(f'Epoch {epoch + 1} / {EPOCHS}')
     multitask.eval()
-    
+    epoch_losses = []
     for batch_idx, batch in enumerate(dataloader_tr):
-        inp_data = torch.tensor(batch['lyrics']).to(DEVICE)
-        val = torch.tensor(batch['valence_tags']).to(DEVICE)
-        aro = torch.tensor(batch['arousal_tags']).to(DEVICE)
-        dom = torch.tensor(batch['dominance_tags']).to(DEVICE)
+        inp_data = batch['lyrics'].to(DEVICE)
+        val = batch['valence_tags'].to(DEVICE)
+        aro = batch['arousal_tags'].to(DEVICE)
+        dom = batch['dominance_tags'].to(DEVICE)
 
         output = multitask(inp_data)
 
@@ -99,13 +111,18 @@ for epoch in range(EPOCHS):
         dominance_loss = dominance_L(output[2], dom)
         loss = valence_loss + arousal_loss + dominance_loss
         loss.backward()
-        torch.nn.utils.clip_grad(multitask.parameters(), max_norm=1)
+        torch.nn.utils.clip_grad_norm(multitask.parameters(), max_norm=1)
         adam.step()
+        epoch_losses.append(loss)
 
-        losses.append(loss)
-        if (batch_idx + 1) % 10:
-            print(f'{batch_idx} / {len(dataloader_tr)}')
-            print(loss)
+        if (batch_idx + 1) % PRINT_STEP:
+            print(f'{batch_idx + 1} / {len(dataloader_tr)}')
+            print(loss.item())
+        if (batch_idx + 1) % SAVE_STEP:
+            losses.append(loss)
+
+    mean_loss = sum(epoch_losses) / len(epoch_losses)
+    scheduler.step(mean_loss)
 
 torch.save(multitask.state_dict(), 'Model.pt')
 

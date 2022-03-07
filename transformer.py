@@ -55,7 +55,7 @@ class Transformer(nn.Module):
                                 nn.ReLU(),
                                 nn.Linear(emb*mult,emb))
         self.dropout = nn.Dropout(dropout)
-        
+         
     def forward(self,X):
         attention = self.attention(X)
         y = self.dropout(self.norm1(attention + X))
@@ -65,7 +65,7 @@ class Transformer(nn.Module):
 
 class Encoder(nn.Module):
     # creating the encoding cell that takes in the transformer
-    def __init__(self,vocab_size, emb_size, num_layers, heads, mult, dropout, maxlength):
+    def __init__(self,vocab_size, emb_size, num_layers, heads, mult, dropout, maxlength, device):
         """
 
         Parameters
@@ -78,6 +78,7 @@ class Encoder(nn.Module):
         dropout:
         maxlength: relates to the positional embedding, the max length of a sentence we want to include (will depend on our data)
         """
+        self.device = device
         super(Encoder, self).__init__()
 
         self.emb_size = emb_size
@@ -92,7 +93,7 @@ class Encoder(nn.Module):
     def forward(self,x):
         N, seq_length = x.shape
 
-        positions = torch.arange(0,seq_length).expand(N,seq_length)#.to(device)
+        positions = torch.arange(0,seq_length).expand(N,seq_length).to(self.device)
 
         # this will learn how words are structured
         out = self.dropout(self.word_emb(x) + self.positional_emb(positions))
