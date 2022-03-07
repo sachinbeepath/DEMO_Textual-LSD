@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 class MultiHeadAttention(nn.Module):
     def __init__(self,emb,heads=8):
@@ -10,11 +9,10 @@ class MultiHeadAttention(nn.Module):
         heads: number of attention heads
         """
         super(MultiHeadAttention, self).__init__()
-        assert(emb%heads == 0, "embedding dimension must be divisble by number of heads")
+        assert emb % heads == 0, "embedding dimension must be divisble by number of heads"
         self.emb = emb
         self.heads = heads
         self.heads_dim = emb//heads
-        print(self.heads_dim)
         
         self.Wq = nn.Linear(self.heads_dim,self.heads_dim,bias=False)
         self.Wv = nn.Linear(self.heads_dim,self.heads_dim,bias=False)

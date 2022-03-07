@@ -17,7 +17,7 @@ class multitaskNet(nn.Module):
                                             nn.Linear(num_heads * embed_len, num_heads)                         # sencond stage compresses embedding dim
                                             )
 
-        self.fc_1 = nn.Sequential(nn.Relu(), nn.Linear(num_heads, num_heads), nn.Dropout(dropout))
+        self.fc_1 = nn.Sequential(nn.ReLU(), nn.Linear(num_heads, num_heads), nn.Dropout(dropout))
         self.fc_valence = nn.Sequential(nn.Linear(num_heads, 2), nn.Dropout(dropout), nn.Softmax())
         self.fc_arousal = nn.Sequential(nn.Linear(num_heads, 2), nn.Dropout(dropout), nn.Softmax())
         self.fc_dominance = nn.Sequential(nn.Linear(num_heads, 2), nn.Dropout(dropout), nn.Softmax())

@@ -9,6 +9,7 @@ import re
 from lyricsScraper import LyricScraper
 import torch
 from torch.utils.data import Dataset
+import utils
 
 '''
 --------LSD_DataLoader-----------
@@ -48,19 +49,24 @@ class LSD_DataLoader(Dataset):
         self.label_cols = label_cols
         self.format = lyric_format
         self.length = 500 # make this actually useful
+        self.vocab = None
         
         #Default lists for character replacement/removal
         self.char_to_remove_default = ["'", '\n', '\r', ',', '!', '?', '.', '"', '_x000D_', '(', ')', '[', ']', '_', '-']
         self.replacement_chars_default = ["", ' ', '', '', ' !', ' ?', ' .', '', '', '', '', '', '', '', '']
-
 
     def __len__(self):
         return len(self.df[self.columns[0]])
     
     def __getitem__(self, idx):
         cols = np.array(self.label_cols)
-        np.insert(cols, 0, self.lyric_col)
-        return {col : self.df[col][idx] for col in cols}
+        out = {col : self.df[col][idx] for col in cols}
+        out[self.lyric_col] = self.vocab.str_to_ind(self.df[self.lyric_col][idx])
+        return out
+
+    def set_vocab(self, v):
+        self.vocab = v
+        return
 
     def change_lyric_format(self, delimiter=' '):
         '''
