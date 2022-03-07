@@ -32,12 +32,12 @@ Contains the primary training loop for the Textual-LSD research network.
 '''
 
 ##### Key Variables #####
-EPOCHS = 10
+EPOCHS = 1
 BATCH_SIZE = 32
-LR = 3e-4
+LR = 5e-4
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
-ATTENTION_HEADS = 4
+ATTENTION_HEADS = 8
 EMBEDDING_SIZE = 256
 NUM_ENCODER_LAYERS = 2
 FORWARD_XP = 4
@@ -69,6 +69,9 @@ english.creat_vocabulary(np.array(dataframe['lyrics'][idx[:int(TRAIN_VAL_SPLIT *
 PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
+print(VOCAB_LEN)
+english.save('vocab.pkl')
+
 
 ##### Create Dataloaders #####
 dataset_tr = Subset(dataset, idx[:int(TRAIN_VAL_SPLIT * len(idx))])
@@ -77,7 +80,7 @@ dataloader_tr = DataLoader(dataset_tr, batch_size=BATCH_SIZE, shuffle=True)
 dataloader_val = DataLoader(dataset_val, batch_size=BATCH_SIZE, shuffle=True)
 
 ##### Prepare Model, Optimizer and Criterion #####
-printc('Creating Models')
+print('Creating Models')
 encoder = tr.Encoder(len(english), EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH+2, DEVICE).to(DEVICE)
 encoder.double()
 multitask = mtn.multitaskNet(encoder, MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, USE_DOM).to(DEVICE)
@@ -94,7 +97,8 @@ losses = []
 # Training Loop
 for epoch in range(EPOCHS):
     print(f'Epoch {epoch + 1} / {EPOCHS}')
-    multitask.eval()
+    multitask.train()
+    encoder.train()
     epoch_losses = []
     for batch_idx, batch in enumerate(dataloader_tr):
         inp_data = batch['lyrics'].to(DEVICE)
@@ -124,7 +128,8 @@ for epoch in range(EPOCHS):
     mean_loss = sum(epoch_losses) / len(epoch_losses)
     scheduler.step(mean_loss)
 
-torch.save(multitask.state_dict(), 'Model.pt')
+torch.save(multitask.state_dict(), 'MTL.pt')
+torch.save(encoder.state_dict(), 'ENC.pt')
 
 print('Done')
 

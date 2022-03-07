@@ -1,6 +1,7 @@
 from sqlite3 import DatabaseError
 from tracemalloc import start
 import numpy as np
+import pickle
 
 #def text_to_index(text, lang):
 #    assert isinstance(text, np.ndarray)
@@ -35,7 +36,6 @@ class Vocabulary():
         max_size : int - maximum size of vocabulary (favours words that occur more frequently)
         min_freq : int - minimum number of occurences of any word to be included in the vocabulary
         '''
-        print(dataset.shape)
         dataset = np.concatenate(dataset)
         bag_of_words, counts = np.unique(dataset, return_counts=True)
         inds = np.argsort(counts)[::-1]
@@ -90,6 +90,17 @@ class Vocabulary():
         get_ind = np.vectorize(get_ind)
 
         return get_ind(arr)
+
+    def save(self, filename):
+        savefile = [self.sos, self.eos, self.pad, self.sos_idx, self.eos_idx, self.pad_idx, self.vocab, self.frequencies]
+        pickle.dump(savefile, open(filename, 'wb'))
+        return
+    
+    def load(self, file):
+        loadfile = pickle.load(open(file, 'rb'))
+        self.sos, self.eos, self.pad, self.sos_idx, self.eos_idx, self.pad_idx, self.vocab, self.frequencies = loadfile
+        return
+
 
     
 

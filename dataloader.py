@@ -20,12 +20,10 @@ containing song lyrics. It can then interface with a Pytorch Dataloader class th
 the __len__ and __getitem__ methods. It also as additional functionality in its methods 
 for cleaning lyrics, tokenizing sentences and applying stemming algorithms for 
 NLP preperation.
-
-
 '''
 
 class LSD_DataLoader(Dataset):
-    def __init__(self, dataFrame,  lyric_col, label_cols, length, lyric_format = 'string'):
+    def __init__(self, dataFrame,  lyric_col, label_cols, length, lyric_format = 'string', label_type='float', label_dict=None):
         '''
         DataSet class for a pandas dataframe containing song lyrics.
 
@@ -37,6 +35,8 @@ class LSD_DataLoader(Dataset):
         lyric_format : string - one of "string" or "list". This determines if the lyrics are stored as one continuous string
                         or as a list of strings with some delimiter character
                         If set to "list" then character removal, remove_between_brackets and tokenization are automatically skipped
+        label_type : string - the datatype of the labels. Affects how they are converted to tensor. ('float', 'string')
+        label_dict : dict - optional dictionary for converting labels to different kind. Required for 'string' label type
         '''
         super().__init__()
         assert isinstance(dataFrame, pd.DataFrame), 'dataFrame must be a Pandas DataFrame object.'
@@ -50,17 +50,22 @@ class LSD_DataLoader(Dataset):
         self.format = lyric_format
         self.length = length # make this actually useful
         self.vocab = None
+        self.label_type = label_type
+        self.label_dict = label_dict
         
         #Default lists for character replacement/removal
-        self.char_to_remove_default = ["'", '\n', '\r', ',', '!', '?', '.', '"', '_x000D_', '(', ')', '[', ']', '_', '-']
-        self.replacement_chars_default = ["", ' ', '', '', ' !', ' ?', ' .', '', '', '', '', '', '', '', '']
+        self.char_to_remove_default = ["'", '\n', '\r', ',', '!', '?', '.', '"', '_x000D_', '(', ')', '[', ']', '_', '-', '*', '%']
+        self.replacement_chars_default = ["", ' ', '', '', ' !', ' ?', ' .', '', '', '', '', '', '', '', '', '', '']
 
     def __len__(self):
         return len(self.df[self.columns[0]])
     
     def __getitem__(self, idx):
         cols = np.array(self.label_cols)
-        out = {col : torch.tensor(self.df[col][idx]) for col in cols}
+        if self.label_type == 'float':
+            out = {col : torch.tensor(self.df[col][idx]) for col in cols}
+        elif self.label_type == 'string':
+            out = {col : torch.tensor(self.df[col].apply(lambda x: self.label_dict[x])[idx]) for col in cols}
         out[self.lyric_col] = torch.tensor(self.vocab.str_to_ind(self.df[self.lyric_col][idx]))
         return out
 
@@ -140,6 +145,7 @@ class LSD_DataLoader(Dataset):
         self.df[self.lyric_col] = self.df[self.lyric_col].apply(lambda song: self.__clean(song, char_to_remove, replacement_chars, remove_between_brackets, 
                                                 stem, stemmer, tokenize, tokenizer, sep, length, pad_token, 
                                                 start_token, end_token))
+        self.format = 'list'
         return
 
     def __clean(self, sentence, char_to_remove, replacement_chars, remove_between_brackets, stem, stemmer, 
@@ -163,7 +169,6 @@ class LSD_DataLoader(Dataset):
                 words = sentence.split(sep)
             else:
                 words = tokenizer(sentence)
-            self.format = 'list'
         else:
             words = sentence 
 
