@@ -32,23 +32,23 @@ Contains the primary training loop for the Textual-LSD research network.
 '''
 
 ##### Key Variables #####
-EPOCHS = 1
-BATCH_SIZE = 8
+EPOCHS = 10
+BATCH_SIZE = 32
 LR = 3e-4
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
-ATTENTION_HEADS = 2
-EMBEDDING_SIZE = 128
-NUM_ENCODER_LAYERS = 1
-FORWARD_XP = 2
+ATTENTION_HEADS = 4
+EMBEDDING_SIZE = 256
+NUM_ENCODER_LAYERS = 2
+FORWARD_XP = 4
 DROPOUT = 0.25
 MAXLENGTH = 200
 MT_HEADS = 4
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 TRAIN_VAL_SPLIT = 0.8
-PRINT_STEP = 100
-SAVE_STEP = 50   
+PRINT_STEP = 25
+SAVE_STEP = 5   
 
 ##### Load Data into Dataset#####
 printc(f'Reading in {FILENAME} and creating dataloaders...')
@@ -113,13 +113,13 @@ for epoch in range(EPOCHS):
         loss.backward()
         torch.nn.utils.clip_grad_norm(multitask.parameters(), max_norm=1)
         adam.step()
-        epoch_losses.append(loss)
+        epoch_losses.append(loss.item())
 
-        if (batch_idx + 1) % PRINT_STEP:
-            print(f'{batch_idx + 1} / {len(dataloader_tr)}')
-            print(loss.item())
-        if (batch_idx + 1) % SAVE_STEP:
-            losses.append(loss)
+        if (batch_idx + 1) % PRINT_STEP == 0:
+            print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
+            print('10 batch average loss:', np.average(epoch_losses[-10:]))
+        if (batch_idx + 1) % SAVE_STEP == 0:
+            losses.append(loss.item())
 
     mean_loss = sum(epoch_losses) / len(epoch_losses)
     scheduler.step(mean_loss)
@@ -127,6 +127,9 @@ for epoch in range(EPOCHS):
 torch.save(multitask.state_dict(), 'Model.pt')
 
 print('Done')
+
+plt.plot(losses)
+plt.show()
 
 
 
