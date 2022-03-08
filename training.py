@@ -1,6 +1,3 @@
-from operator import le
-from statistics import mean
-from tabnanny import verbose
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -32,19 +29,20 @@ Contains the primary training loop for the Textual-LSD research network.
 '''
 
 ##### Key Variables #####
-EPOCHS = 1
-BATCH_SIZE = 32
-LR = 5e-4
+EPOCHS = 10
+BATCH_SIZE = 64
+LR = 3e-4
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
 ATTENTION_HEADS = 8
-EMBEDDING_SIZE = 256
-NUM_ENCODER_LAYERS = 2
+EMBEDDING_SIZE = 512
+NUM_ENCODER_LAYERS = 3
 FORWARD_XP = 4
 DROPOUT = 0.25
-MAXLENGTH = 200
+MAXLENGTH = 500
 MT_HEADS = 4
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+print('Using ', DEVICE)
 
 TRAIN_VAL_SPLIT = 0.8
 PRINT_STEP = 25
@@ -70,7 +68,7 @@ PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 print(VOCAB_LEN)
-english.save('vocab.pkl')
+english.save('vocab_big.pkl')
 
 
 ##### Create Dataloaders #####
@@ -100,6 +98,7 @@ for epoch in range(EPOCHS):
     multitask.train()
     encoder.train()
     epoch_losses = []
+    t = time.time()
     for batch_idx, batch in enumerate(dataloader_tr):
         inp_data = batch['lyrics'].to(DEVICE)
         val = batch['valence_tags'].to(DEVICE)
@@ -110,9 +109,9 @@ for epoch in range(EPOCHS):
 
         adam.zero_grad()
 
-        valence_loss = valence_L(output[0], val)
-        arousal_loss = arousal_L(output[1], aro)
-        dominance_loss = dominance_L(output[2], dom)
+        valence_loss = valence_L(torch.flatten(output[0]), val)
+        arousal_loss = arousal_L(torch.flatten(output[1]), aro)
+        dominance_loss = dominance_L(torch.flatten(output[2]), dom)
         loss = valence_loss + arousal_loss + dominance_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm(multitask.parameters(), max_norm=1)
@@ -124,12 +123,12 @@ for epoch in range(EPOCHS):
             print('10 batch average loss:', np.average(epoch_losses[-10:]))
         if (batch_idx + 1) % SAVE_STEP == 0:
             losses.append(loss.item())
-
+    print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
     scheduler.step(mean_loss)
 
-torch.save(multitask.state_dict(), 'MTL.pt')
-torch.save(encoder.state_dict(), 'ENC.pt')
+torch.save(multitask.state_dict(), 'MTL_big.pt')
+torch.save(encoder.state_dict(), 'ENC_big.pt')
 
 print('Done')
 
