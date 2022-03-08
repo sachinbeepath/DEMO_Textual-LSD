@@ -29,18 +29,19 @@ Contains the primary training loop for the Textual-LSD research network.
 '''
 
 ##### Key Variables #####
-EPOCHS = 10
-BATCH_SIZE = 64
-LR = 3e-4
+# Hashed values are those used in the reference paper
+EPOCHS = 4 #Until convergence
+BATCH_SIZE = 16 # 8
+LR = 2e-4 #2e-5
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
-ATTENTION_HEADS = 8
-EMBEDDING_SIZE = 512
-NUM_ENCODER_LAYERS = 3
+ATTENTION_HEADS = 8 # 8
+EMBEDDING_SIZE = 256 # 512
+NUM_ENCODER_LAYERS = 3 # 3
 FORWARD_XP = 4
-DROPOUT = 0.25
-MAXLENGTH = 500
-MT_HEADS = 4
+DROPOUT = 0.25 # 0.1
+MAXLENGTH = 500 #1024
+MT_HEADS = 4 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
@@ -68,7 +69,7 @@ PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 print(VOCAB_LEN)
-english.save('vocab_big.pkl')
+#english.save('vocab_big.pkl')
 
 
 ##### Create Dataloaders #####
@@ -85,7 +86,7 @@ multitask = mtn.multitaskNet(encoder, MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DRO
 multitask.double()
 
 adam = optim.Adam(multitask.parameters(), lr=LR) # Fine tune this hypPs...
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.1, patience=0.19, verbose=True)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.1, patience=10, verbose=True)
 
 valence_L = nn.MSELoss()
 arousal_L = nn.MSELoss()
@@ -120,12 +121,12 @@ for epoch in range(EPOCHS):
 
         if (batch_idx + 1) % PRINT_STEP == 0:
             print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
-            print('10 batch average loss:', np.average(epoch_losses[-10:]))
+            print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-10:]))
+            scheduler.step(np.average(epoch_losses[-PRINT_STEP:]))
         if (batch_idx + 1) % SAVE_STEP == 0:
             losses.append(loss.item())
     print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
-    scheduler.step(mean_loss)
 
 torch.save(multitask.state_dict(), 'MTL_big.pt')
 torch.save(encoder.state_dict(), 'ENC_big.pt')
