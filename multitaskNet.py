@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-
-
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class multitaskNet(nn.Module):
@@ -19,9 +17,9 @@ class multitaskNet(nn.Module):
                                             )
 
         self.fc_1 = nn.Sequential(nn.ReLU(), nn.Linear(num_heads, num_heads), nn.Dropout(dropout))
-        self.fc_valence = nn.Sequential(nn.Linear(num_heads, 2), nn.Dropout(dropout), nn.Softmax())
-        self.fc_arousal = nn.Sequential(nn.Linear(num_heads, 2), nn.Dropout(dropout), nn.Softmax())
-        self.fc_dominance = nn.Sequential(nn.Linear(num_heads, 2), nn.Dropout(dropout), nn.Softmax())
+        self.fc_valence = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
+        self.fc_arousal = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
+        self.fc_dominance = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
 
     def forward(self, x):
         '''
@@ -36,6 +34,6 @@ class multitaskNet(nn.Module):
         arousal = self.fc_arousal(out)
         if self.use_dom:
             dominance = self.fc_dominance(out)
-            return torch.stack((valence, arousal, dominance))[:, :, 0]
+            return torch.stack((valence, arousal, dominance))
         else:
-            return torch.stack((valence, arousal))[:, :, 0]
+            return torch.stack((valence, arousal))
