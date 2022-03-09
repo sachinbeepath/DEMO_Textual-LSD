@@ -28,20 +28,35 @@ This is the main training script.
 Contains the primary training loop for the Textual-LSD research network.
 '''
 
+def VA_to_quadrant(V, A):
+    quads = []
+    for v, a in zip(V, A):
+        if v > 0:
+            if a > 0:
+                quads.append(0)
+            else:
+                quads.append(3)
+        else:
+            if a > 0:
+                quads.append(1)
+            else:
+                quads.append(2)
+    return torch.tensor(quads)
+
 ##### Key Variables #####
 # Hashed values are those used in the reference paper
-EPOCHS = 4 #Until convergence
-BATCH_SIZE = 16 # 8
-LR = 2e-4 #2e-5
+EPOCHS = 1 #Until convergence
+BATCH_SIZE = 2 # 8
+LR = 3e-4 #2e-5
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
-ATTENTION_HEADS = 8 # 8
-EMBEDDING_SIZE = 256 # 512
+ATTENTION_HEADS = 4 # 8
+EMBEDDING_SIZE = 128 # 512
 NUM_ENCODER_LAYERS = 3 # 3
 FORWARD_XP = 4
-DROPOUT = 0.25 # 0.1
-MAXLENGTH = 500 #1024
-MT_HEADS = 4 # 8
+DROPOUT = 0.1 # 0.1
+MAXLENGTH = 200 #1024
+MT_HEADS = 8 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
@@ -56,7 +71,7 @@ dataframe = pd.DataFrame(file)
 ps = PorterStemmer()
 stemmer = lambda x: ps.stem(x)
 dataset = dl.LSD_DataLoader(dataframe, 'lyrics', ['valence_tags', 'arousal_tags', 'dominance_tags'], MAXLENGTH)
-dataset.scale_VAD_scores(10, 5)
+dataset.scale_VAD_scores(5, 5)
 dataset.clean_lyrics(remove_between_brackets=True, stem=True, stemmer=stemmer, tokenize=True, tokenizer=word_tokenize, length=MAXLENGTH)
 idx = np.arange(0, len(dataset), 1)
 np.random.shuffle(idx)
@@ -85,12 +100,13 @@ encoder.double()
 multitask = mtn.multitaskNet(encoder, MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, USE_DOM).to(DEVICE)
 multitask.double()
 
-adam = optim.Adam(multitask.parameters(), lr=LR) # Fine tune this hypPs...
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.1, patience=10, verbose=True)
+adam = optim.AdamW(multitask.parameters(), lr=LR) # Fine tune this hypPs...
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.2, patience=20, verbose=True)
 
 valence_L = nn.MSELoss()
 arousal_L = nn.MSELoss()
 dominance_L = nn.MSELoss()
+quad_L = nn.CrossEntropyLoss()
 
 losses = []
 # Training Loop
@@ -105,21 +121,25 @@ for epoch in range(EPOCHS):
         val = batch['valence_tags'].to(DEVICE)
         aro = batch['arousal_tags'].to(DEVICE)
         dom = batch['dominance_tags'].to(DEVICE)
+        quad = VA_to_quadrant(val, aro).to(DEVICE)
 
-        output = multitask(inp_data)
+        output, quad_pred = multitask(inp_data)
 
         adam.zero_grad()
 
         valence_loss = valence_L(torch.flatten(output[0]), val)
         arousal_loss = arousal_L(torch.flatten(output[1]), aro)
-        dominance_loss = dominance_L(torch.flatten(output[2]), dom)
-        loss = valence_loss + arousal_loss + dominance_loss
+        dominance_loss = dominance_L(torch.flatten(output[2]), dom) if USE_DOM == True else torch.tensor([0])
+        quad_loss = quad_L(quad_pred, quad)
+        loss = 0.2 * valence_loss + 0.2 * arousal_loss + 0.2 * dominance_loss + 0.4 * quad_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm(multitask.parameters(), max_norm=1)
         adam.step()
         epoch_losses.append(loss.item())
 
         if (batch_idx + 1) % PRINT_STEP == 0:
+            print('')
+            print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
             print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
             print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-10:]))
             scheduler.step(np.average(epoch_losses[-PRINT_STEP:]))
@@ -128,13 +148,13 @@ for epoch in range(EPOCHS):
     print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
 
-torch.save(multitask.state_dict(), 'MTL_big.pt')
-torch.save(encoder.state_dict(), 'ENC_big.pt')
+#torch.save(multitask.state_dict(), 'MTL_big.pt')
+#torch.save(encoder.state_dict(), 'ENC_big.pt')
 
 print('Done')
 
-plt.plot(losses)
-plt.show()
+#plt.plot(losses)
+#plt.show()
 
 
 

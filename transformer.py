@@ -49,10 +49,10 @@ class Transformer(nn.Module):
         super(Transformer,self).__init__()
 
         self.attention = MultiHeadAttention(emb,heads)
-        self.norm1 = nn.LayerNorm(emb)
+        self.norm1 = nn.LayerNorm(emb) 
         self.norm2 = nn.LayerNorm(emb)
         self.fout = nn.Sequential(nn.Linear(emb,emb*mult),
-                                nn.ReLU(),
+                                nn.LeakyReLU(),
                                 nn.Linear(emb*mult,emb))
         self.dropout = nn.Dropout(dropout)
          

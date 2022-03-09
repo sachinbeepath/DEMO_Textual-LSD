@@ -47,12 +47,12 @@ def VA_to_quadrant(v, a):
 BATCH_SIZE = 8
 USE_DOM = True
 FILENAME = 'Comparison_2500_songs_lyrics.xlsx'
-ATTENTION_HEADS = 8
-EMBEDDING_SIZE = 256
-NUM_ENCODER_LAYERS = 3
+ATTENTION_HEADS = 4
+EMBEDDING_SIZE = 128
+NUM_ENCODER_LAYERS = 2
 FORWARD_XP = 4
 DROPOUT = 0.25
-MAXLENGTH = 500
+MAXLENGTH = 20
 MT_HEADS = 4
 LABEL_DICT = {'relaxed': 4, 'angry': 2, 'happy': 1, 'sad': 3}
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -103,16 +103,17 @@ for batch_idx, batch in enumerate(dataloader_te):
     inp_data = batch['Lyrics'].to(DEVICE)
     quadrant = batch['Mood'].to(DEVICE)
 
-    output = torch.flatten(multitask(inp_data), start_dim=1)
+    output, quad_pred = torch.flatten(multitask(inp_data), start_dim=1)
+    quad_pred = torch.argmax(quad_pred)
     print(output.shape)
     print(quadrant.shape)
 
     for i in range(output.shape[1]):
-        pred = VA_to_quadrant(output[0, i].item(), output[1, i].item())
-        if pred == quadrant[i]:
+        #pred = VA_to_quadrant(output[0, i].item(), output[1, i].item())
+        if quad_pred == quadrant[i]:
             correct += 1
         total += 1
-        quad_predictions.append(pred)
+        quad_predictions.append(quad_pred)
         predictions.append(output[:, i].cpu().detach().numpy())
 
     if (batch_idx + 1) % PRINT_STEP == 0:

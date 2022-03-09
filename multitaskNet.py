@@ -16,10 +16,11 @@ class multitaskNet(nn.Module):
                                             nn.Linear(embed_len, num_heads)                         # sencond stage compresses embedding dim
                                             )
 
-        self.fc_1 = nn.Sequential(nn.ReLU(), nn.Linear(num_heads, num_heads), nn.Dropout(dropout))
+        self.fc_1 = nn.Sequential(nn.LeakyReLU(), nn.Linear(num_heads, num_heads), nn.Dropout(dropout))
         self.fc_valence = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
         self.fc_arousal = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
         self.fc_dominance = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
+        self.fc_quad = nn.Sequential(nn.Linear(num_heads, 4), nn.Dropout(dropout), nn.Softmax())
 
     def forward(self, x):
         '''
@@ -32,8 +33,9 @@ class multitaskNet(nn.Module):
         out = self.fc_1(out)                            #BxH
         valence = self.fc_valence(out)                  #Bx2 for the rest
         arousal = self.fc_arousal(out)
+        quad = self.fc_quad(out)
         if self.use_dom:
             dominance = self.fc_dominance(out)
-            return torch.stack((valence, arousal, dominance))
+            return torch.stack((valence, arousal, dominance)), quad
         else:
-            return torch.stack((valence, arousal))
+            return torch.stack((valence, arousal)), quad
