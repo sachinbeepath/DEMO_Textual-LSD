@@ -1,3 +1,4 @@
+from tkinter import Y
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -47,16 +48,16 @@ def VA_to_quadrant(V, A):
 # Hashed values are those used in the reference paper
 EPOCHS = 1 #Until convergence
 BATCH_SIZE = 2 # 8
-LR = 3e-5 #2e-5
+LR = 3e-3 #2e-5
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
-ATTENTION_HEADS = 8 # 8
-EMBEDDING_SIZE = 512 # 512
-NUM_ENCODER_LAYERS = 3 # 3
-FORWARD_XP = 8
-DROPOUT = 0.25 # 0.1
-MAXLENGTH = 300 #1024
-MT_HEADS = 32 # 8
+ATTENTION_HEADS = 1 # 8
+EMBEDDING_SIZE = 32 # 512
+NUM_ENCODER_LAYERS = 1 # 3
+FORWARD_XP = 4
+DROPOUT = 0.0 # 0.1
+MAXLENGTH = 20 #1024
+MT_HEADS = 4 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
@@ -130,7 +131,7 @@ for epoch in range(EPOCHS):
         arousal_loss = arousal_L(torch.flatten(output[1]), aro)
         dominance_loss = dominance_L(torch.flatten(output[2]), dom) if USE_DOM == True else torch.tensor([0])
         quad_loss = quad_L(quad_pred, quad)
-        loss = quad_loss + valence_loss + arousal_loss + dominance_loss
+        loss = valence_loss + arousal_loss + dominance_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
         adam.step()
@@ -138,11 +139,11 @@ for epoch in range(EPOCHS):
 
         if (batch_idx + 1) % PRINT_STEP == 0:
             print('')
-            print(quad, val, aro)
-            #print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
-            #print(f'Max SoftMax Scores: {quad_pred}')
-            #print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
-            #print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-10:]))
+            #print(quad, val, aro)
+            print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
+            print(f'Max SoftMax Scores: {quad_pred}')
+            print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
+            print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-10:]))
             scheduler.step(np.average(epoch_losses[-PRINT_STEP:]))
         if (batch_idx + 1) % SAVE_STEP == 0:
             losses.append(loss.item())

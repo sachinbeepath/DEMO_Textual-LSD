@@ -19,7 +19,7 @@ class multitaskNet(nn.Module):
                                             nn.LeakyReLU(),
                                             nn.Linear(embed_len, 2 * hidden_size)                         # sencond stage compresses embedding dim
                                             )
-
+        
         self.fc_1 = nn.Sequential(nn.LeakyReLU(), nn.Linear(2 * hidden_size, hidden_size), nn.Dropout(dropout))
         self.fc_valence = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
         self.fc_arousal = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
