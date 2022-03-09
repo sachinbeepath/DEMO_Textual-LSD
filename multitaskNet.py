@@ -1,26 +1,30 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import transformer as trans
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class multitaskNet(nn.Module):
-    def __init__(self, encoder, num_heads, sent_len, embed_len, dropout, device, dom=True):
+    def __init__(self, hidden_size, sent_len, embed_len, dropout, device, vocab_size, num_layers, att_heads, mult, dom=True):
         super(multitaskNet, self).__init__()
         self.device = device
-        self.enc = encoder # parameters already defined in training loop
+        self.enc = trans.Encoder(vocab_size, embed_len, num_layers, att_heads, mult, dropout, sent_len, device)
+        self.enc.double()
         self.use_dom = dom
 
         self.sequence_summary = nn.Sequential(
                                             nn.Flatten(), #flatten sequence, heads and embedding dimensions
                                             nn.Linear(sent_len * embed_len, embed_len), # first linear stage compresses sequence dim
-                                            nn.Linear(embed_len, num_heads)                         # sencond stage compresses embedding dim
+                                            nn.LeakyReLU(),
+                                            nn.Linear(embed_len, 2 * hidden_size)                         # sencond stage compresses embedding dim
                                             )
 
-        self.fc_1 = nn.Sequential(nn.LeakyReLU(), nn.Linear(num_heads, num_heads), nn.Dropout(dropout))
-        self.fc_valence = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
-        self.fc_arousal = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
-        self.fc_dominance = nn.Sequential(nn.Linear(num_heads, 1), nn.Dropout(dropout), nn.Tanh())
-        self.fc_quad = nn.Sequential(nn.Linear(num_heads, 4), nn.Dropout(dropout), nn.Softmax())
+        self.fc_1 = nn.Sequential(nn.LeakyReLU(), nn.Linear(2 * hidden_size, hidden_size), nn.Dropout(dropout))
+        self.fc_valence = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
+        self.fc_arousal = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
+        self.fc_dominance = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
+        self.fc_quad = nn.Sequential(nn.ReLU(), nn.Linear(hidden_size, 4))
 
     def forward(self, x):
         '''

@@ -47,22 +47,22 @@ def VA_to_quadrant(V, A):
 # Hashed values are those used in the reference paper
 EPOCHS = 1 #Until convergence
 BATCH_SIZE = 2 # 8
-LR = 3e-4 #2e-5
+LR = 3e-5 #2e-5
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
-ATTENTION_HEADS = 4 # 8
-EMBEDDING_SIZE = 128 # 512
+ATTENTION_HEADS = 8 # 8
+EMBEDDING_SIZE = 512 # 512
 NUM_ENCODER_LAYERS = 3 # 3
-FORWARD_XP = 4
-DROPOUT = 0.1 # 0.1
-MAXLENGTH = 200 #1024
-MT_HEADS = 8 # 8
+FORWARD_XP = 8
+DROPOUT = 0.25 # 0.1
+MAXLENGTH = 300 #1024
+MT_HEADS = 32 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
 TRAIN_VAL_SPLIT = 0.8
 PRINT_STEP = 25
-SAVE_STEP = 5   
+SAVE_STEP = 10  
 
 ##### Load Data into Dataset#####
 printc(f'Reading in {FILENAME} and creating dataloaders...')
@@ -95,9 +95,9 @@ dataloader_val = DataLoader(dataset_val, batch_size=BATCH_SIZE, shuffle=True)
 
 ##### Prepare Model, Optimizer and Criterion #####
 print('Creating Models')
-encoder = tr.Encoder(len(english), EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH+2, DEVICE).to(DEVICE)
-encoder.double()
-multitask = mtn.multitaskNet(encoder, MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, USE_DOM).to(DEVICE)
+#encoder = tr.Encoder(len(english), EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH+2, DEVICE).to(DEVICE)
+#encoder.double()
+multitask = mtn.multitaskNet(MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, VOCAB_LEN, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, USE_DOM).to(DEVICE)
 multitask.double()
 
 adam = optim.AdamW(multitask.parameters(), lr=LR) # Fine tune this hypPs...
@@ -109,11 +109,10 @@ dominance_L = nn.MSELoss()
 quad_L = nn.CrossEntropyLoss()
 
 losses = []
+multitask.train()
 # Training Loop
 for epoch in range(EPOCHS):
     print(f'Epoch {epoch + 1} / {EPOCHS}')
-    multitask.train()
-    encoder.train()
     epoch_losses = []
     t = time.time()
     for batch_idx, batch in enumerate(dataloader_tr):
@@ -131,17 +130,19 @@ for epoch in range(EPOCHS):
         arousal_loss = arousal_L(torch.flatten(output[1]), aro)
         dominance_loss = dominance_L(torch.flatten(output[2]), dom) if USE_DOM == True else torch.tensor([0])
         quad_loss = quad_L(quad_pred, quad)
-        loss = 0.2 * valence_loss + 0.2 * arousal_loss + 0.2 * dominance_loss + 0.4 * quad_loss
+        loss = quad_loss + valence_loss + arousal_loss + dominance_loss
         loss.backward()
-        torch.nn.utils.clip_grad_norm(multitask.parameters(), max_norm=1)
+        torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
         adam.step()
         epoch_losses.append(loss.item())
 
         if (batch_idx + 1) % PRINT_STEP == 0:
             print('')
-            print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
-            print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
-            print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-10:]))
+            print(quad, val, aro)
+            #print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
+            #print(f'Max SoftMax Scores: {quad_pred}')
+            #print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
+            #print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-10:]))
             scheduler.step(np.average(epoch_losses[-PRINT_STEP:]))
         if (batch_idx + 1) % SAVE_STEP == 0:
             losses.append(loss.item())
@@ -153,8 +154,8 @@ for epoch in range(EPOCHS):
 
 print('Done')
 
-#plt.plot(losses)
-#plt.show()
+plt.plot(losses)
+plt.show()
 
 
 
