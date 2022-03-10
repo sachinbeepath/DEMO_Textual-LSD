@@ -1,3 +1,4 @@
+from audioop import bias
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,14 +17,14 @@ class multitaskNet(nn.Module):
         self.sequence_summary = nn.Sequential(
                                             nn.Flatten(), #flatten sequence, heads and embedding dimensions
                                             nn.Linear(sent_len * embed_len, embed_len), # first linear stage compresses sequence dim
-                                            nn.LeakyReLU(),
+                                            nn.ReLU(),
                                             nn.Linear(embed_len, 2 * hidden_size)                         # sencond stage compresses embedding dim
                                             )
         
-        self.fc_1 = nn.Sequential(nn.LeakyReLU(), nn.Linear(2 * hidden_size, hidden_size), nn.Dropout(dropout))
-        self.fc_valence = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
-        self.fc_arousal = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
-        self.fc_dominance = nn.Sequential(nn.Linear(hidden_size, 1), nn.Dropout(dropout), nn.Tanh())
+        self.fc_1 = nn.Sequential(nn.ReLU(), nn.Dropout(dropout), nn.Linear(2 * hidden_size, hidden_size))
+        self.fc_valence = nn.Linear(hidden_size, 2, bias=False)
+        self.fc_arousal = nn.Linear(hidden_size, 2, bias=False)
+        self.fc_dominance = nn.Linear(hidden_size, 2, bias=False)
         self.fc_quad = nn.Sequential(nn.ReLU(), nn.Linear(hidden_size, 4))
 
     def forward(self, x):

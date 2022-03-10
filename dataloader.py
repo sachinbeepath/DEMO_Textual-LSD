@@ -63,7 +63,7 @@ class LSD_DataLoader(Dataset):
     def __getitem__(self, idx):
         cols = np.array(self.label_cols)
         if self.label_type == 'float':
-            out = {col : torch.tensor(self.df[col][idx]) for col in cols}
+            out = {col : torch.tensor((self.df[col][idx] < 0) * 1.) for col in cols}
         elif self.label_type == 'string':
             out = {col : torch.tensor(self.df[col].apply(lambda x: self.label_dict[x])[idx]) for col in cols}
         out[self.lyric_col] = torch.tensor(self.vocab.str_to_ind(self.df[self.lyric_col][idx]))

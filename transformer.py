@@ -26,6 +26,8 @@ class MultiHeadAttention(nn.Module):
         X: input data with dimensions (batch, number of embedding vectors, dimension of embedding vectors)
         """
         b, n, d = X.shape
+        #2x102x128
+        #2x102x4x32
         
         data = X.view(b,n,self.heads,self.heads_dim)
         q = self.Wq(data) #(b,n,heads,heads_dim)
@@ -52,7 +54,7 @@ class Transformer(nn.Module):
         self.norm1 = nn.LayerNorm(emb) 
         self.norm2 = nn.LayerNorm(emb)
         self.fout = nn.Sequential(nn.Linear(emb,emb*mult),
-                                nn.LeakyReLU(),
+                                nn.ReLU(),
                                 nn.Linear(emb*mult,emb))
         self.dropout = nn.Dropout(dropout)
          

@@ -46,24 +46,24 @@ def VA_to_quadrant(V, A):
 
 ##### Key Variables #####
 # Hashed values are those used in the reference paper
-EPOCHS = 1 #Until convergence
-BATCH_SIZE = 2 # 8
-LR = 3e-3 #2e-5
+EPOCHS = 4 #Until convergence
+BATCH_SIZE = 8 # 8
+LR = 3e-4 #2e-5
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
-ATTENTION_HEADS = 1 # 8
-EMBEDDING_SIZE = 32 # 512
-NUM_ENCODER_LAYERS = 1 # 3
+ATTENTION_HEADS = 8 # 8
+EMBEDDING_SIZE = 256 # 512
+NUM_ENCODER_LAYERS = 3 # 3
 FORWARD_XP = 4
-DROPOUT = 0.0 # 0.1
-MAXLENGTH = 20 #1024
-MT_HEADS = 4 # 8
+DROPOUT = 0.25 # 0.1
+MAXLENGTH = 512 #1024
+MT_HEADS = 8 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
 TRAIN_VAL_SPLIT = 0.8
-PRINT_STEP = 25
-SAVE_STEP = 10  
+PRINT_STEP = 100
+SAVE_STEP = 25  
 
 ##### Load Data into Dataset#####
 printc(f'Reading in {FILENAME} and creating dataloaders...')
@@ -104,9 +104,9 @@ multitask.double()
 adam = optim.AdamW(multitask.parameters(), lr=LR) # Fine tune this hypPs...
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.2, patience=20, verbose=True)
 
-valence_L = nn.MSELoss()
-arousal_L = nn.MSELoss()
-dominance_L = nn.MSELoss()
+valence_L = nn.CrossEntropyLoss()
+arousal_L = nn.CrossEntropyLoss()
+dominance_L = nn.CrossEntropyLoss()
 quad_L = nn.CrossEntropyLoss()
 
 losses = []
@@ -118,40 +118,40 @@ for epoch in range(EPOCHS):
     t = time.time()
     for batch_idx, batch in enumerate(dataloader_tr):
         inp_data = batch['lyrics'].to(DEVICE)
-        val = batch['valence_tags'].to(DEVICE)
-        aro = batch['arousal_tags'].to(DEVICE)
-        dom = batch['dominance_tags'].to(DEVICE)
+        val = batch['valence_tags'].long().to(DEVICE)
+        aro = batch['arousal_tags'].long().to(DEVICE)
+        dom = batch['dominance_tags'].long().to(DEVICE)
         quad = VA_to_quadrant(val, aro).to(DEVICE)
-
         output, quad_pred = multitask(inp_data)
-
         adam.zero_grad()
 
-        valence_loss = valence_L(torch.flatten(output[0]), val)
-        arousal_loss = arousal_L(torch.flatten(output[1]), aro)
-        dominance_loss = dominance_L(torch.flatten(output[2]), dom) if USE_DOM == True else torch.tensor([0])
+        valence_loss = valence_L(output[0], val)
+        arousal_loss = arousal_L(output[1], aro)
+        dominance_loss = dominance_L(output[2], dom) if USE_DOM == True else torch.tensor([0])
         quad_loss = quad_L(quad_pred, quad)
-        loss = valence_loss + arousal_loss + dominance_loss
+        loss = arousal_loss + valence_loss + dominance_loss + quad_loss
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
+        #torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
         adam.step()
         epoch_losses.append(loss.item())
 
         if (batch_idx + 1) % PRINT_STEP == 0:
             print('')
             #print(quad, val, aro)
-            print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
-            print(f'Max SoftMax Scores: {quad_pred}')
+            #print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
+            #print(f'Quadrant Scores: {quad_pred}')
             print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
-            print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-10:]))
+            print('VAL', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
+            print('ARO', output[1, :2].detach().cpu().numpy(), aro[:2].detach().cpu().numpy())
+            print('DOM', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
+            print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-PRINT_STEP:]))
             scheduler.step(np.average(epoch_losses[-PRINT_STEP:]))
         if (batch_idx + 1) % SAVE_STEP == 0:
-            losses.append(loss.item())
+            losses.append(np.average(epoch_losses[-SAVE_STEP:]))
     print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
 
-#torch.save(multitask.state_dict(), 'MTL_big.pt')
-#torch.save(encoder.state_dict(), 'ENC_big.pt')
+torch.save(multitask.state_dict(), 'MTL_clasification.pt')
 
 print('Done')
 
