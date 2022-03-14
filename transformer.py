@@ -14,6 +14,9 @@ class MultiHeadAttention(nn.Module):
         self.heads = heads
         self.heads_dim = emb//heads
         
+        self.queries = nn.Linear(self.emb, self.emb, bias=False)
+        self.keys = nn.Linear(self.emb, self.emb, bias=False)
+        self.values = nn.Linear(self.emb, self.emb, bias=False)
         self.Wq = nn.Linear(self.heads_dim,self.heads_dim,bias=False)
         self.Wv = nn.Linear(self.heads_dim,self.heads_dim,bias=False)
         self.Wk = nn.Linear(self.heads_dim,self.heads_dim,bias=False)
@@ -28,11 +31,17 @@ class MultiHeadAttention(nn.Module):
         b, n, d = X.shape
         #2x102x128
         #2x102x4x32
+        queries = self.queries(X)
+        keys = self.keys(X)
+        values = self.values(X)
+        #data = X.view(b,n,self.heads,self.heads_dim)
+        queries = queries.reshape(b, n, self.heads, self.heads_dim)
+        keys = keys.reshape(b, n, self.heads, self.heads_dim)
+        values = values.reshape(b, n, self.heads, self.heads_dim)
         
-        data = X.view(b,n,self.heads,self.heads_dim)
-        q = self.Wq(data) #(b,n,heads,heads_dim)
-        v = self.Wv(data) #(b,n,heads,heads_dim)
-        k = self.Wk(data) #(b,n,heads,heads_dim)
+        q = self.Wq(queries) #(b,n,heads,heads_dim)
+        v = self.Wv(values) #(b,n,heads,heads_dim)
+        k = self.Wk(keys) #(b,n,heads,heads_dim)
         W = torch.einsum("nqhd,nkhd->nhqk",[q,k])
         attention = F.softmax(W/(d**(1/2)),dim=3)
         Y = torch.einsum("nhqk,nkhd->nqhd",[attention,v]).reshape(b,n,self.emb) #(b,n,d)
@@ -99,7 +108,6 @@ class Encoder(nn.Module):
 
         # this will learn how words are structured
         out = self.dropout(self.word_emb(x) + self.positional_emb(positions))
-
         for layer in self.layers:
             # the out out out refer to the value key and query
             out = layer(out) # all inputs are the same

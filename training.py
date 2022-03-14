@@ -46,24 +46,24 @@ def VA_to_quadrant(V, A):
 
 ##### Key Variables #####
 # Hashed values are those used in the reference paper
-EPOCHS = 4 #Until convergence
-BATCH_SIZE = 8 # 8
+EPOCHS = 40 #Until convergence
+BATCH_SIZE = 16 # 8
 LR = 3e-4 #2e-5
 USE_DOM = True
 FILENAME = 'Data_8500_songs.xlsx'
 ATTENTION_HEADS = 8 # 8
-EMBEDDING_SIZE = 256 # 512
-NUM_ENCODER_LAYERS = 3 # 3
-FORWARD_XP = 4
-DROPOUT = 0.25 # 0.1
-MAXLENGTH = 512 #1024
+EMBEDDING_SIZE = 64 # 512
+NUM_ENCODER_LAYERS = 1 # 3
+FORWARD_XP = 64
+DROPOUT = 0.1 # 0.1
+MAXLENGTH = 256 #1024
 MT_HEADS = 8 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
 TRAIN_VAL_SPLIT = 0.8
-PRINT_STEP = 100
-SAVE_STEP = 25  
+PRINT_STEP = 200
+SAVE_STEP = 10  
 
 ##### Load Data into Dataset#####
 printc(f'Reading in {FILENAME} and creating dataloaders...')
@@ -85,7 +85,7 @@ PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 print(VOCAB_LEN)
-#english.save('vocab_big.pkl')
+english.save('vocab_emb64.pkl')
 
 
 ##### Create Dataloaders #####
@@ -98,11 +98,13 @@ dataloader_val = DataLoader(dataset_val, batch_size=BATCH_SIZE, shuffle=True)
 print('Creating Models')
 #encoder = tr.Encoder(len(english), EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH+2, DEVICE).to(DEVICE)
 #encoder.double()
-multitask = mtn.multitaskNet(MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, VOCAB_LEN, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, USE_DOM).to(DEVICE)
+multitask = mtn.multitaskNet(MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, 
+                            VOCAB_LEN, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, 
+                            PAD_IDX, USE_DOM).to(DEVICE)
 multitask.double()
 
 adam = optim.AdamW(multitask.parameters(), lr=LR) # Fine tune this hypPs...
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.2, patience=20, verbose=True)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(adam, factor=0.2, patience=10, verbose=True)
 
 valence_L = nn.CrossEntropyLoss()
 arousal_L = nn.CrossEntropyLoss()
@@ -110,6 +112,9 @@ dominance_L = nn.CrossEntropyLoss()
 quad_L = nn.CrossEntropyLoss()
 
 losses = []
+valpoints = []
+aropoints = []
+true_quads = []
 multitask.train()
 # Training Loop
 for epoch in range(EPOCHS):
@@ -122,7 +127,7 @@ for epoch in range(EPOCHS):
         aro = batch['arousal_tags'].long().to(DEVICE)
         dom = batch['dominance_tags'].long().to(DEVICE)
         quad = VA_to_quadrant(val, aro).to(DEVICE)
-        output, quad_pred = multitask(inp_data)
+        output, quad_pred = multitask(inp_data, version=0)
         adam.zero_grad()
 
         valence_loss = valence_L(output[0], val)
@@ -134,6 +139,10 @@ for epoch in range(EPOCHS):
         #torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
         adam.step()
         epoch_losses.append(loss.item())
+        if batch_idx != len(dataloader_tr) and (epoch + 1) % 8 == 0 : #ignore final batch since differnt size
+            valpoints.append(torch.squeeze(torch.softmax(output, dim=2)[0, :, 0]).detach().cpu().numpy())
+            aropoints.append(torch.squeeze(torch.softmax(output, dim=2)[1, :, 0]).detach().cpu().numpy())
+
 
         if (batch_idx + 1) % PRINT_STEP == 0:
             print('')
@@ -141,9 +150,9 @@ for epoch in range(EPOCHS):
             #print(f'True Quadrant: {quad.detach().cpu().numpy()}, Predicted: {np.argmax(quad_pred.detach().cpu().numpy(), axis=1)}')
             #print(f'Quadrant Scores: {quad_pred}')
             print(f'Batch {batch_idx + 1} / {len(dataloader_tr)}')
-            print('VAL', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
-            print('ARO', output[1, :2].detach().cpu().numpy(), aro[:2].detach().cpu().numpy())
-            print('DOM', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
+            #print('VAL', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
+            #print('ARO', output[1, :2].detach().cpu().numpy(), aro[:2].detach().cpu().numpy())
+            #print('DOM', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
             print(f'{PRINT_STEP} batch average loss:', np.average(epoch_losses[-PRINT_STEP:]))
             scheduler.step(np.average(epoch_losses[-PRINT_STEP:]))
         if (batch_idx + 1) % SAVE_STEP == 0:
@@ -151,11 +160,16 @@ for epoch in range(EPOCHS):
     print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
 
-torch.save(multitask.state_dict(), 'MTL_clasification.pt')
+torch.save(multitask.state_dict(), 'MTL_clasification_emb64.pt')
+
+valpoints = np.concatenate(valpoints).reshape(-1)
+aropoints = np.concatenate(aropoints).reshape(-1)
+print(valpoints)
 
 print('Done')
 
-plt.plot(losses)
+plt.scatter(valpoints, aropoints, s=0.2, c=np.repeat(np.linspace(0, 1, int(len(valpoints) / BATCH_SIZE)), BATCH_SIZE))
+plt.legend()
 plt.show()
 
 
