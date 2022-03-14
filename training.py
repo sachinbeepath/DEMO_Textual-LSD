@@ -85,7 +85,7 @@ PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 print(VOCAB_LEN)
-english.save('vocab_emb64.pkl')
+#english.save('vocab_emb64.pkl')
 
 
 ##### Create Dataloaders #####

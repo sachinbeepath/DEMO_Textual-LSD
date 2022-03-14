@@ -30,35 +30,50 @@ import multitaskNet as mtn
 This is the main testing script.
 Contains the primary testing loop for the Textual-LSD research network.
 '''
-def VA_to_quadrant(v, a):
-    if v > 0:
-        if a > 0:
-            return 1
+def VA_to_quadrant(V, A):
+    quads = []
+    for v, a in zip(V, A):
+        if v > 0:
+            if a > 0:
+                quads.append(0)
+            else:
+                quads.append(3)
         else:
-            return 4
-    else:
-        if a > 0:
-            return 2
-        else:
-            return 3
+            if a > 0:
+                quads.append(1)
+            else:
+                quads.append(2)
+    return torch.tensor(quads)
 
+def ArgMax_to_quadrant(V, A):
+    '''
+    Takes in the argmaxes for valence and arousal
+    1 = positive, 0 = negative  
+    '''
+    quads = []
+    d = {'0,0':2, '0,1':1, '1,1':0, '1,0':3}
+    for v, a in zip(V, A):
+        a = f'{int(v)},{int(a)}'
+        quads.append(d[a])
+    return torch.tensor(quads)
 
 ##### Key Variables #####
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 USE_DOM = True
-FILENAME = 'Comparison_2500_songs_lyrics.xlsx'
-ATTENTION_HEADS = 4
-EMBEDDING_SIZE = 128
-NUM_ENCODER_LAYERS = 2
-FORWARD_XP = 4
-DROPOUT = 0.25
-MAXLENGTH = 20
-MT_HEADS = 4
-LABEL_DICT = {'relaxed': 4, 'angry': 2, 'happy': 1, 'sad': 3}
+FILENAME = 'Data_8500_songs.xlsx'
+ATTENTION_HEADS = 8
+EMBEDDING_SIZE = 64
+NUM_ENCODER_LAYERS = 1
+FORWARD_XP = 64
+DROPOUT = 0.1
+MAXLENGTH = 256
+MT_HEADS = 8
+LABEL_DICT = {'relaxed': 3, 'angry': 1, 'happy': 0, 'sad': 2}
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 PRINT_STEP = 5
 SAVE_STEP = 5   
+TRAIN_VAL_SPLIT = 0.8
 
 ##### Load Data into Dataset#####
 printc(f'Reading in {FILENAME} and creating dataloaders...')
@@ -66,7 +81,8 @@ file = pd.read_excel(FILENAME)
 dataframe = pd.DataFrame(file)
 ps = PorterStemmer()
 stemmer = lambda x: ps.stem(x)
-dataset = dl.LSD_DataLoader(dataframe, 'Lyrics', ['Mood'], MAXLENGTH, 'string', 'string', LABEL_DICT)
+dataset = dl.LSD_DataLoader(dataframe, 'lyrics', ['valence_tags', 'arousal_tags', 'dominance_tags'], MAXLENGTH)
+dataset.scale_VAD_scores(5, 5)
 dataset.clean_lyrics(remove_between_brackets=True, stem=True, stemmer=stemmer, tokenize=True, tokenizer=word_tokenize, length=MAXLENGTH)
 idx = np.arange(0, len(dataset), 1)
 np.random.shuffle(idx)
@@ -74,60 +90,58 @@ np.random.shuffle(idx)
 ##### Vocab work #####
 printc('Creating vocabulary from training data...')
 english = utils.Vocabulary()
-english.load('vocab_big.pkl')
+english.load('vocab_emb64.pkl')
 PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 
 ##### Create Dataloaders #####
-dataloader_te = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+dataset_val = Subset(dataset, idx[int(TRAIN_VAL_SPLIT * len(idx)):])
+dataloader_val = DataLoader(dataset_val, batch_size=BATCH_SIZE, shuffle=True)
 
 ##### Prepare Model, Optimizer and Criterion #####
 print('Creating Models') #Such a janky solution for weird difference in vocab length. Deffo gonna break
-encoder = tr.Encoder(VOCAB_LEN, EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH+2, DEVICE).to(DEVICE)
-encoder.double()
-encoder.load_state_dict(torch.load('ENC_big.pt'))
-multitask = mtn.multitaskNet(encoder, MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, USE_DOM).to(DEVICE)
+multitask = mtn.multitaskNet(MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, 
+                            VOCAB_LEN, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, 
+                            PAD_IDX, USE_DOM).to(DEVICE)
 multitask.double()
-multitask.load_state_dict(torch.load('MTL_big.pt'))
+multitask.load_state_dict(torch.load('MTL_clasification_emb64.pt'))
 
 losses = []
 # Testing Loop
 multitask.eval()
-encoder.eval()
 total = 0
-correct = 0
+correct_raw = 0
+correct_am = 0
 quad_predictions = []
 predictions = []
-for batch_idx, batch in enumerate(dataloader_te):
-    inp_data = batch['Lyrics'].to(DEVICE)
-    quadrant = batch['Mood'].to(DEVICE)
-
-    output, quad_pred = torch.flatten(multitask(inp_data), start_dim=1)
-    quad_pred = torch.argmax(quad_pred)
-    print(output.shape)
-    print(quadrant.shape)
-
-    for i in range(output.shape[1]):
-        #pred = VA_to_quadrant(output[0, i].item(), output[1, i].item())
-        if quad_pred == quadrant[i]:
-            correct += 1
-        total += 1
-        quad_predictions.append(quad_pred)
-        predictions.append(output[:, i].cpu().detach().numpy())
-
+for batch_idx, batch in enumerate(dataloader_val):
+    inp_data = batch['lyrics'].to(DEVICE)
+    val = batch['valence_tags'].long().to(DEVICE)
+    aro = batch['arousal_tags'].long().to(DEVICE)
+    dom = batch['dominance_tags'].long().to(DEVICE)
+    quad = VA_to_quadrant(val, aro).to(DEVICE)
+    output, quad_pred_raw = multitask(inp_data, version=0)
+    quad_pred_am = ArgMax_to_quadrant(torch.argmax(output[0], dim=1), torch.argmax(output[1], dim=1)).numpy()
+    quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
+    quad = quad.detach().cpu().numpy()
+    
     if (batch_idx + 1) % PRINT_STEP == 0:
-        print(f'Batch {batch_idx + 1} / {len(dataloader_te)}')
+        print('')
+        print(f'Batch {batch_idx + 1} / {len(dataloader_val)}')
+        print(quad_pred_am, quad_pred_raw, quad)
 
-print(f'Accuracy of quadrant predictions: {100 * correct / total:.4f}%')
+    correct_raw += sum(quad_pred_raw == quad)
+    correct_am += sum(quad_pred_am == quad)
+    total += inp_data.shape[0]
 
-torch.save(multitask.state_dict(), 'Model.pt')
 
-fig, axs = plt.subplots(nrows=2, ncols=2)
-axs[0,0].plot(losses)
-axs[0,1].plot()
-#axs[0,1].plot()
-plt.show()
+print(f'Accuracy of base quadrant predictions: {100 * correct_raw / total:.4f}%')
+print(f'Accuracy of VA quadrant predictions: {100 * correct_am / total:.4f}%')
+
+
+
+
 
 
 
