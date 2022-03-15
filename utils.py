@@ -137,10 +137,3 @@ def generate_test_val(dataframe, split, fnames, type='excel'):
     print('Files Saved')
     return
 
-"""
-FILENAME = 'Data_8500_songs.xlsx'
-file = pd.read_excel(FILENAME)
-dataframe = pd.DataFrame(file)
-
-generate_test_val(dataframe, 0.8, ['8500_songs_training.xlsx', '8500_songs_validation.xlsx'])
-"""
