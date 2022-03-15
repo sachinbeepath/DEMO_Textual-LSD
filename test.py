@@ -1,15 +1,8 @@
-from operator import le
-from statistics import mean
-from tabnanny import verbose
 import torch
-import torch.optim as optim
-import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import time
-import argparse
 import utils
 import os
 from nltk.tokenize import word_tokenize
