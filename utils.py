@@ -1,7 +1,6 @@
-from sqlite3 import DatabaseError
-from tracemalloc import start
 import numpy as np
 import pickle
+import pandas as pd
 
 #def text_to_index(text, lang):
 #    assert isinstance(text, np.ndarray)
@@ -102,5 +101,44 @@ class Vocabulary():
         return
 
 
-    
+def generate_test_val(dataframe, split, fnames, type='excel'):
+    '''
+    Creates seperate files for train and val sets.
 
+    Parameters
+    ---------------------
+    dataframe : Pandas.DataFrame - dataframe to be split
+    split : float 0 < s < 1 - proportion to be assigned to train
+    fnames : list<string> - name for each train and val file, inluding extension
+    type : string - type of save format (excel, csv, pickle)
+    '''
+    assert isinstance(dataframe, pd.DataFrame), 'Not a dataframe!'
+    assert type in ['excel', 'csv', 'pickle'], 'invalid save format!'
+    assert len(fnames) == 2, 'Must be exactly two file names'
+    assert split < 1, 'Split must be less than 1'
+    assert split > 0, 'Split must be greater than 0'
+
+    idx = np.arange(0, len(dataframe), 1)
+    np.random.shuffle(idx)
+    tr = idx[:int(len(idx) * split)]
+    val = idx[int(len(idx) * split):]
+
+    train = dataframe.iloc[tr, :]
+    validation = dataframe.iloc[val, :]
+    if type == 'excel':
+        train.to_excel(fnames[0])
+        validation.to_excel(fnames[1])
+    elif type == 'csv':
+        train.to_csv(fnames[0])
+        validation.to_csv(fnames[1])
+    if type == 'pickle':
+        train.to_pickle(fnames[0])
+        validation.to_pickle(fnames[1])
+    print('Files Saved')
+    return
+
+FILENAME = 'Data_8500_songs.xlsx'
+file = pd.read_excel(FILENAME)
+dataframe = pd.DataFrame(file)
+
+generate_test_val(dataframe, 0.8, ['8500_songs_training.xlsx', '8500_songs_validation.xlsx'])
