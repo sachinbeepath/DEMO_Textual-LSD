@@ -1,15 +1,9 @@
 import pandas as pd
 import numpy as np
-import nltk
-from nltk.stem import PorterStemmer
-from nltk.tokenize import word_tokenize
-from nltk.corpus import words as ws 
-import os
 import re
-from lyricsScraper import LyricScraper
 import torch
 from torch.utils.data import Dataset
-import utils
+
 
 '''
 --------LSD_DataLoader-----------
