@@ -52,6 +52,27 @@ def ArgMax_to_quadrant(V, A):
         quads.append(d[a])
     return torch.tensor(quads)
 
+def p_r_f(C):
+    """
+    Calculates precision, recall and f-score from a confusion matrix
+    """
+    
+    if C.shape == (2,2):
+        TN = C[0,0]
+        TP = C[1,1]
+        FN = C[1,0]
+        FP = C[0,1]
+    else:
+        TP = np.diag(C)
+        FP = np.sum(C, axis=0) - TP
+        FN = np.sum(C, axis=1) - TP
+
+    precision = TP/(TP+FP)
+    recall = TP/(TP+FN)
+    f_score = 2*precision*recall/(precision+recall)
+    
+    return precision, recall, f_score
+
 ##### Key Variables #####
 BATCH_SIZE = 16
 USE_DOM = True
@@ -116,6 +137,9 @@ correct_am = 0
 Cmat_raw = np.zeros((4,4))
 Cmat_am = np.zeros((4,4))
 
+Cmat_val = np.zeros((2,2))
+Cmat_aro = np.zeros((2,2))
+
 quad_predictions = []
 predictions = []
 
@@ -128,7 +152,9 @@ for batch_idx, batch in enumerate(dataloader_val):
     dom = batch['dominance_tags'].long().to(DEVICE)
     quad = VA_to_quadrant(val, aro).to(DEVICE)
     output, quad_pred_raw = multitask(inp_data, version=0)
-    quad_pred_am = ArgMax_to_quadrant(torch.argmax(output[0], dim=1), torch.argmax(output[1], dim=1)).numpy()
+    val_pred = torch.argmax(output[0], dim=1)
+    aro_pred = torch.argmax(output[1], dim=1)
+    quad_pred_am = ArgMax_to_quadrant(val_pred, aro_pred).numpy()
     quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
     quad = quad.detach().cpu().numpy()
     
@@ -143,6 +169,15 @@ for batch_idx, batch in enumerate(dataloader_val):
     correct_am += sum(quad_pred_am == quad)
     Cmat_am += confusion_matrix(quad_pred_am,quad,labels=labels)
     total += inp_data.shape[0]
+    
+    Cmat_val += confusion_matrix(val_pred,val,labels=[0,1])
+    Cmat_aro += confusion_matrix(aro_pred,aro,labels=[0,1])
+
+
+p_raw, r_raw, f_raw = p_r_f(Cmat_raw)
+p_am, r_am, f_am = p_r_f(Cmat_am)
+p_val, r_val, f_val = p_r_f(Cmat_val)
+p_aro, r_aro, f_aro = p_r_f(Cmat_aro)
 
 
 print(f'Accuracy of base quadrant predictions: {100 * correct_raw / total:.4f}%')
@@ -150,3 +185,15 @@ print(f'Accuracy of VA quadrant predictions: {100 * correct_am / total:.4f}%')
 
 print('Confusion matrix of base quadrant predictions:',Cmat_raw)
 print('Confusion matrix of VA quadrant predictions:',Cmat_am)
+
+print('Confusion matrix of valence predictions:',Cmat_val)
+print('Confusion matrix of arousal predictions:',Cmat_aro)
+
+print('Per-label precision, recall, and f-score of base quadrant predictions: {},{},{}'.format(np.round(p_raw,3),np.round(r_raw,3),np.round(f_raw,3)))
+print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
+
+
+print('Precision, recall, and f-score valence predictions: {},{},{}'.format(round(p_val,3),round(r_val,3),round(f_val,3)))
+print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
+
+
