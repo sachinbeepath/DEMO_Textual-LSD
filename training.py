@@ -50,7 +50,7 @@ EPOCHS = 40 #Until convergence
 BATCH_SIZE = 16 # 8
 LR = 3e-4 #2e-5
 USE_DOM = True
-FILENAME = 'Data_8500_songs.xlsx'
+FILENAME = '8500_songs_training.xlsx'
 ATTENTION_HEADS = 8 # 8
 EMBEDDING_SIZE = 64 # 512
 NUM_ENCODER_LAYERS = 1 # 3
@@ -61,7 +61,6 @@ MT_HEADS = 8 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
-TRAIN_VAL_SPLIT = 0.8
 PRINT_STEP = 200
 SAVE_STEP = 10  
 
@@ -74,30 +73,20 @@ stemmer = lambda x: ps.stem(x)
 dataset = dl.LSD_DataLoader(dataframe, 'lyrics', ['valence_tags', 'arousal_tags', 'dominance_tags'], MAXLENGTH)
 dataset.scale_VAD_scores(5, 5)
 dataset.clean_lyrics(remove_between_brackets=True, stem=True, stemmer=stemmer, tokenize=True, tokenizer=word_tokenize, length=MAXLENGTH)
-idx = np.arange(0, len(dataset), 1)
-np.random.shuffle(idx)
+dataloader_tr = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 ##### Vocab work #####
 printc('Creating vocabulary from training data...')
 english = utils.Vocabulary(start_token='<SOS>', end_token='<EOS>', pad_token='<PAD>')
-english.creat_vocabulary(np.array(dataframe['lyrics'][idx[:int(TRAIN_VAL_SPLIT * len(idx))]]), max_size=30000, min_freq=5)
+english.creat_vocabulary(np.array(dataframe['lyrics']), max_size=30000, min_freq=5)
 PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 print(VOCAB_LEN)
 #english.save('vocab_emb64.pkl')
 
-
-##### Create Dataloaders #####
-dataset_tr = Subset(dataset, idx[:int(TRAIN_VAL_SPLIT * len(idx))])
-dataset_val = Subset(dataset, idx[int(TRAIN_VAL_SPLIT * len(idx)):])
-dataloader_tr = DataLoader(dataset_tr, batch_size=BATCH_SIZE, shuffle=True)
-dataloader_val = DataLoader(dataset_val, batch_size=BATCH_SIZE, shuffle=True)
-
 ##### Prepare Model, Optimizer and Criterion #####
 print('Creating Models')
-#encoder = tr.Encoder(len(english), EMBEDDING_SIZE, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, DROPOUT, MAXLENGTH+2, DEVICE).to(DEVICE)
-#encoder.double()
 multitask = mtn.multitaskNet(MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEVICE, 
                             VOCAB_LEN, NUM_ENCODER_LAYERS, ATTENTION_HEADS, FORWARD_XP, 
                             PAD_IDX, USE_DOM).to(DEVICE)
@@ -160,7 +149,7 @@ for epoch in range(EPOCHS):
     print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
 
-torch.save(multitask.state_dict(), 'MTL_clasification_emb64.pt')
+torch.save(multitask.state_dict(), 'FILENAME.pt')
 
 valpoints = np.concatenate(valpoints).reshape(-1)
 aropoints = np.concatenate(aropoints).reshape(-1)
