@@ -1,4 +1,3 @@
-from tkinter import Y
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -51,17 +50,17 @@ BATCH_SIZE = 16 # 8
 LR = 3e-4 #2e-5
 USE_DOM = True
 FILENAME = '8500_songs_training.xlsx'
-ATTENTION_HEADS = 8 # 8
+ATTENTION_HEADS = 4 # 8
 EMBEDDING_SIZE = 64 # 512
 NUM_ENCODER_LAYERS = 1 # 3
-FORWARD_XP = 64
+FORWARD_XP = 32
 DROPOUT = 0.1 # 0.1
 MAXLENGTH = 256 #1024
 MT_HEADS = 8 # 8
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using ', DEVICE)
 
-PRINT_STEP = 200
+PRINT_STEP = 50
 SAVE_STEP = 10  
 
 ##### Load Data into Dataset#####
@@ -83,7 +82,7 @@ PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 print(VOCAB_LEN)
-english.save('vocab_emb64.pkl')
+english.save('vocab_emb64_v2.pkl')
 
 ##### Prepare Model, Optimizer and Criterion #####
 print('Creating Models')
@@ -106,6 +105,8 @@ aropoints = []
 true_quads = []
 multitask.train()
 # Training Loop
+print(f'Number of batches per epoch: {len(dataloader_tr)}')
+print(f'Printing every {PRINT_STEP} batches, saving every {SAVE_STEP} batches')
 for epoch in range(EPOCHS):
     print(f'Epoch {epoch + 1} / {EPOCHS}')
     epoch_losses = []
@@ -149,16 +150,17 @@ for epoch in range(EPOCHS):
     print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
 
-torch.save(multitask.state_dict(), 'MTL_clasification_1epoch.pt')
+torch.save(multitask.state_dict(), 'MTL_clasification_50eps.pt')
 
-valpoints = np.concatenate(valpoints).reshape(-1)
-aropoints = np.concatenate(aropoints).reshape(-1)
-print(valpoints)
+#valpoints = np.concatenate(valpoints).reshape(-1)
+#aropoints = np.concatenate(aropoints).reshape(-1)
+#print(valpoints)
 
 print('Done')
-
-plt.scatter(valpoints, aropoints, s=0.2, c=np.repeat(np.linspace(0, 1, int(len(valpoints) / BATCH_SIZE)), BATCH_SIZE))
-plt.legend()
+averaging_step = 10
+plt.plot(np.convolve(losses, np.ones(averaging_step) / averaging_step))
+#plt.scatter(valpoints, aropoints, s=0.2, c=np.repeat(np.linspace(0, 1, int(len(valpoints) / BATCH_SIZE)), BATCH_SIZE))
+#plt.legend()
 plt.show()
 
 

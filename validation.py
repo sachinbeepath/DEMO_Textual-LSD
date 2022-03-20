@@ -77,10 +77,10 @@ def p_r_f(C):
 BATCH_SIZE = 16
 USE_DOM = True
 FILENAME = '8500_songs_validation.xlsx' 
-ATTENTION_HEADS = 8
+ATTENTION_HEADS = 4
 EMBEDDING_SIZE = 64
 NUM_ENCODER_LAYERS = 1
-FORWARD_XP = 64
+FORWARD_XP = 32
 DROPOUT = 0.1
 MAXLENGTH = 256
 MT_HEADS = 8
@@ -107,7 +107,7 @@ np.random.shuffle(idx)
 ##### Vocab work #####
 printc('Creating vocabulary from training data...')
 english = utils.Vocabulary()
-english.load('vocab_emb64.pkl')
+english.load('vocab_emb64_v2.pkl')
 PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
@@ -124,7 +124,7 @@ multitask = mtn.multitaskNet(MT_HEADS, MAXLENGTH+2, EMBEDDING_SIZE, DROPOUT, DEV
 multitask.double()
 
 # change file name
-multitask.load_state_dict(torch.load('MTL_clasification_1epoch.pt'))
+multitask.load_state_dict(torch.load('MTL_clasification_50eps.pt'))
 
 losses = []
 # Testing Loop
@@ -161,7 +161,7 @@ for batch_idx, batch in enumerate(dataloader_val):
     if (batch_idx + 1) % PRINT_STEP == 0:
         print('')
         print(f'Batch {batch_idx + 1} / {len(dataloader_val)}')
-        print(quad_pred_am, quad_pred_raw, quad)
+        #print(quad_pred_am, quad_pred_raw, quad)
 
     correct_raw += sum(quad_pred_raw == quad)
     Cmat_raw += confusion_matrix(quad_pred_raw,quad,labels=labels)
@@ -170,8 +170,8 @@ for batch_idx, batch in enumerate(dataloader_val):
     Cmat_am += confusion_matrix(quad_pred_am,quad,labels=labels)
     total += inp_data.shape[0]
     
-    Cmat_val += confusion_matrix(val_pred,val,labels=[0,1])
-    Cmat_aro += confusion_matrix(aro_pred,aro,labels=[0,1])
+    Cmat_val += confusion_matrix(val_pred.cpu(),val.cpu(),labels=[0,1])
+    Cmat_aro += confusion_matrix(aro_pred.cpu(),aro.cpu(),labels=[0,1])
 
 
 p_raw, r_raw, f_raw = p_r_f(Cmat_raw)
