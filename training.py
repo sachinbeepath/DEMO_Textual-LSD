@@ -118,7 +118,7 @@ for epoch in range(EPOCHS):
         quad = VA_to_quadrant(val, aro).to(DEVICE)
         output, quad_pred = multitask(inp_data, version=0)
         adam.zero_grad()
-
+        
         valence_loss = valence_L(output[0], val)
         arousal_loss = arousal_L(output[1], aro)
         dominance_loss = dominance_L(output[2], dom) if USE_DOM == True else torch.tensor([0])
