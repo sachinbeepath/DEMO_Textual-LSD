@@ -83,7 +83,7 @@ PAD_IDX = english.pad_idx
 VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 print(VOCAB_LEN)
-#english.save('vocab_emb64.pkl')
+english.save('vocab_emb64.pkl')
 
 ##### Prepare Model, Optimizer and Criterion #####
 print('Creating Models')
@@ -149,7 +149,7 @@ for epoch in range(EPOCHS):
     print(f'Epoch Time: {time.time() - t:.1f}s')
     mean_loss = sum(epoch_losses) / len(epoch_losses)
 
-torch.save(multitask.state_dict(), 'FILENAME.pt')
+torch.save(multitask.state_dict(), 'MTL_clasification_1epoch.pt')
 
 valpoints = np.concatenate(valpoints).reshape(-1)
 aropoints = np.concatenate(aropoints).reshape(-1)
