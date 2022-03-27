@@ -1,4 +1,5 @@
-from tkinter import Y
+import sys
+print(sys.path)
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -13,7 +14,7 @@ import os
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import nltk
-import gensim.models.word2vec as w2v
+#import gensim
 import multiprocessing
 import logging
 import codecs
@@ -94,10 +95,11 @@ print(VOCAB_LEN)
 #### WORD2VEC ####
 
 corpus = dataset.get_dataframe(english)
-lyrics = corpus.lyrics
+lyrics = corpus['lyrics'].tolist()
+print(len(lyrics))
 
 # train word2vec
-num_features = 300
+num_features = 32
 min_word_count = 3
 num_workers = multiprocessing.cpu_count()
 context_size = 7
