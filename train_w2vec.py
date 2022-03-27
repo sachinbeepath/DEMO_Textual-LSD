@@ -94,9 +94,24 @@ print(VOCAB_LEN)
 
 #### WORD2VEC ####
 
+<<<<<<< HEAD
 corpus = dataset.get_dataframe(english)
 lyrics = corpus['lyrics'].tolist()
 print(len(lyrics))
+=======
+corpus = dataset.get_dataframe()
+lyrics = corpus.lyrics
+>>>>>>> 4ada8bb55f8036854f2fb2b9c85c0928319c3984
+
+# changing lyrics to a list
+n = len(lyrics)
+main_list = []
+for i in range(n):
+    sub_list=[]
+    for word in lyrics[i]:
+        sub_list.append(word)
+    main_list.append(sub_list)
+lyrics = main_list
 
 # train word2vec
 num_features = 32
@@ -106,9 +121,16 @@ context_size = 7
 downsampling = 1e-3
 seed = 1
 
-lyrics2vec = w2v.Word2Vec(sg=1, seed=seed, workers=num_workers, size=num_features, min_count=min_word_count,
+lyrics2vec = w2v.Word2Vec(sg=1, seed=seed, workers=num_workers, size=32, min_count=min_word_count,
     window=context_size, sample=downsampling)
 
 lyrics2vec.build_vocab(lyrics)
 
-lyrics2vec.train(lyrics, total_words = VOCAB_LEN, epochs = 1)
+lyrics2vec.train(lyrics,total_words = n, epochs =1)
+
+if not os.path.exists("trained"):
+    os.makedirs("trained")
+lyrics2vec.save(os.path.join("trained", "lyrics2vec.w2v"))
+lyrics2vec = w2v.Word2Vec.load(os.path.join("trained", "lyrics2vec.w2v"))
+
+
