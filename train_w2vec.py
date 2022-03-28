@@ -106,11 +106,7 @@ lyrics = main_list
 
 # train word2vec
 num_features = 32
-<<<<<<< HEAD
-min_word_count = 3
-=======
 min_word_count = 5
->>>>>>> cec9bba416a8afd73b3faf4eb7043f234d1ee33c
 num_workers = multiprocessing.cpu_count()
 context_size = 7
 downsampling = 1e-3
