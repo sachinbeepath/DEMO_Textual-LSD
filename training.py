@@ -1,8 +1,10 @@
+from tkinter.tix import MAX
 import torch
+import utils
 
 ##### Key Variables #####
 # Hashed values are those used in the reference paper
-EPOCHS = 50 #Until convergence
+EPOCHS = 1 #Until convergence
 BATCH_SIZE = 64 # 8
 LR = 3e-3 #2e-5
 USE_DOM = True
@@ -20,6 +22,13 @@ print('Using ', DEVICE)
 PRINT_STEP = 50
 SAVE_STEP = 5 
 
+trainer = utils.Textual_LSD_Training(verbose=True)
+trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
+trainer.generate_vocab()
+trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
+                        LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE)
+trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'Test.pt')
+trainer.plot_data(averaging_window=10)
 
 
 

@@ -136,6 +136,8 @@ class Textual_LSD_Training():
                         label_cols = ['valence_tags', 'arousal_tags', 'dominance_tags'], 
                         remove_between_brackets=True, stem=True, stemmer=PorterStemmer(), 
                         tokenize=True, tokenizer=word_tokenize):
+        if self.verbose:
+            print('Starting Load Dataset...')
         file = pd.read_excel(fname)
         df = pd.DataFrame(file)
         ps = stemmer
@@ -155,6 +157,8 @@ class Textual_LSD_Training():
         return
 
     def generate_vocab(self, save=False, save_name=None):
+        if self.verbose:
+            print('Starting Generate Vocab...')
         assert self.dataset is not None, 'Please load in a dataset before generating a vocabulary'
         assert self.dataframe is not None, 'Please load in a dataframe before generating a vocabulary'
 
@@ -173,6 +177,8 @@ class Textual_LSD_Training():
         return 
     
     def load_vocab(self, fname):
+        if self.verbose:
+            print('Starting Load Vocab...')
         assert self.dataset is not None, 'Please load in a dataset before loading a vocabulary'
 
         english = Vocabulary()
@@ -184,6 +190,8 @@ class Textual_LSD_Training():
 
     def generate_models(self, emb_size, att_heads, drp, dom, lr, mt_heads, num_enc, 
                         forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True):
+        if self.verbose:
+            print('Starting Generate Models...')
         assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
         assert self.pad_idx is not None, 'Please generate or load a vocabulary before training'
 
@@ -201,12 +209,18 @@ class Textual_LSD_Training():
         self.quad_L = nn.CrossEntropyLoss()
         self.device = dev
         self.use_dom = dom
+        if self.verbose:
+            print('Models Generated...')
         return 
 
     def load_models(self, fname, lr, lr_fact=0.2, lr_pat=10, lr_verbose=True):
+        if self.verbose:
+            print('Starting Load Models...')
         self.multitask.load_state_dict(torch.load(fname, map_location=self.device))
         self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+        if self.verbose:
+            print('Models Loaded')
         return
 
     def VA_to_quadrant(self, V, A):
@@ -236,7 +250,9 @@ class Textual_LSD_Training():
             total = 0
             correct = 0
             print(f'Epoch {epoch + 1} / {epochs}')
+            t_0 = time.time()
             t = time.time()
+            epoch_l = []
             for batch_idx, batch in enumerate(self.dataloader):
                 inp_data = batch['lyrics'].to(self.device)
                 val = batch['valence_tags'].long().to(self.device)
@@ -248,17 +264,17 @@ class Textual_LSD_Training():
                 
                 valence_loss = self.valence_L(output[0], val)
                 arousal_loss = self.arousal_L(output[1], aro)
-                dominance_loss = self.dominance_L(output[2], dom) if dom == True else torch.tensor([0])
+                dominance_loss = self.dominance_L(output[2], dom) if self.use_dom == True else torch.tensor([0])
                 quad_loss = self.quad_L(quad_pred, quad)
                 loss = arousal_loss + valence_loss + dominance_loss + quad_loss
                 loss.backward()
                 #torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
                 self.optim.step()
-
+                epoch_l.append(loss.item())
                 # Calcuate Accuracy
                 total += len(batch)
                 for i in range(len(batch)):
-                    correct += 1 if quad[i] == quad_pred[i] else 0
+                    correct += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
 
                 if (batch_idx + 1) % print_step == 0:
                     if self.verbose:
@@ -270,10 +286,10 @@ class Textual_LSD_Training():
                         print('DOM pred/true', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
                         print('Quadrant pred/true', np.argmax(quad_pred.detach().cpu().numpy(), axis=1), quad.detach().cpu().numpy())
                     if show_loss:
-                        print(f'{print_step} batch average loss:', np.average(self.losses[-print_step:]))
+                        print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
 
                 if (batch_idx + 1) % save_step == 0:
-                    self.losses.append(np.average(self.losses[-save_step:]))
+                    self.losses.append(np.average(epoch_l[-save_step:]))
                     if batch_idx != len(self.dataloader) and (epoch + 1) % 8 == 0 : #ignore final batch since differnt size
                         self.valpoints.append(torch.squeeze(torch.softmax(output, dim=2)[0, :, 0]).detach().cpu().numpy())
                         self.aropoints.append(torch.squeeze(torch.softmax(output, dim=2)[1, :, 0]).detach().cpu().numpy())
@@ -295,6 +311,8 @@ class Textual_LSD_Training():
                 torch.save(self.multitask.state_dict(), name)
                 if self.verbose:
                     print(f'Successfully saved model weights as {name}')
+            else:
+                print(f'Training Compeleted. Total time: {time.time() - t_0:.0f}s')
         return 
         
     def return_values(self, losses=True, acc=False, val_preds=False, aro_preds=False):
@@ -309,10 +327,13 @@ class Textual_LSD_Training():
             returns.append(self.aropoints)
         return tuple(returns)
 
-    def plot_data(self):
+    def plot_data(self, averaging_window=20):
+        w = np.ones(averaging_window) / averaging_window
         fig, axs = plt.subplots(2)
-        axs[0].plot(self.losses)
-        axs[1].plot(self.accuracy)
+        axs[0].plot(np.convolve(self.losses[averaging_window:-averaging_window], w))
+        axs[0].set_title('Training Losses')
+        axs[1].plot(np.convolve(self.accuracy[averaging_window:-averaging_window], w))
+        axs[1].set_title('Quadrant Prediction Accuracy')
         plt.show()
         return
 
