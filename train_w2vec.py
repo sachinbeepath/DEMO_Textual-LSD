@@ -15,8 +15,6 @@ from nltk.stem import PorterStemmer
 import nltk
 import gensim.models.word2vec as w2v
 import multiprocessing
-import logging
-import codecs
 
 clear = lambda: os.system('cls')
 
@@ -57,7 +55,7 @@ LR = 3e-4 #2e-5
 USE_DOM = True
 FILENAME = '8500_songs_training.xlsx'
 ATTENTION_HEADS = 8 # 8
-EMBEDDING_SIZE = 64 # 512
+EMBEDDING_SIZE = 32 # 512
 NUM_ENCODER_LAYERS = 1 # 3
 FORWARD_XP = 64
 DROPOUT = 0.1 # 0.1
@@ -92,7 +90,6 @@ print(VOCAB_LEN)
 
 
 #### WORD2VEC ####
-
 corpus = dataset.get_dataframe()
 lyrics = corpus.lyrics
 
@@ -107,23 +104,38 @@ for i in range(n):
 lyrics = main_list
 
 # train word2vec
-num_features = 300
-min_word_count = 3
+num_features = 32
+min_word_count = 5
 num_workers = multiprocessing.cpu_count()
 context_size = 7
 downsampling = 1e-3
 seed = 1
 
-lyrics2vec = w2v.Word2Vec(sg=1, seed=seed, workers=num_workers, size=32, min_count=min_word_count,
+lyrics2vec = w2v.Word2Vec(sg=1, seed=seed, workers=num_workers, size=num_features, min_count=min_word_count,
     window=context_size, sample=downsampling)
 
 lyrics2vec.build_vocab(lyrics)
 
-lyrics2vec.train(lyrics,total_words = n, epochs =1)
+lyrics2vec.train(lyrics,total_words=n, epochs =15)
 
 if not os.path.exists("trained"):
     os.makedirs("trained")
 lyrics2vec.save(os.path.join("trained", "lyrics2vec.w2v"))
 lyrics2vec = w2v.Word2Vec.load(os.path.join("trained", "lyrics2vec.w2v"))
 
+vectors = lyrics2vec.wv.vectors # embeddings of all the words in the corpus
 
+### Getting embeddings of words in our vocab ###
+
+# end up w tensor of dim 6.5k x 32
+# building the matrix of weights to be loaded into pytorch embedding layer
+
+weights_matrix = np.zeros(VOCAB_LEN,EMBEDDING_SIZE)
+words_found = 0
+
+for i, word in enumerate(english.vocab):
+    try:
+        weights_matrix[i] = lyrics2vec[word]
+        words_found += 1
+    except KeyError:
+        weights_matrix[i] = np.random.normal(scale=0.6, size=(EMBEDDING_SIZE,))
