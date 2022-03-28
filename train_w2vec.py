@@ -94,14 +94,8 @@ print(VOCAB_LEN)
 
 #### WORD2VEC ####
 
-<<<<<<< HEAD
-corpus = dataset.get_dataframe(english)
-lyrics = corpus['lyrics'].tolist()
-print(len(lyrics))
-=======
 corpus = dataset.get_dataframe()
 lyrics = corpus.lyrics
->>>>>>> 4ada8bb55f8036854f2fb2b9c85c0928319c3984
 
 # changing lyrics to a list
 n = len(lyrics)
