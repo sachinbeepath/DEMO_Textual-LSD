@@ -76,7 +76,7 @@ class Transformer(nn.Module):
 
 class Encoder(nn.Module):
     # creating the encoding cell that takes in the transformer
-    def __init__(self,vocab_size, emb_size, num_layers, heads, mult, dropout, maxlength, device):
+    def __init__(self,vocab_size, emb_size, num_layers, heads, mult, dropout, maxlength, device, w2v=None):
         """
 
         Parameters
@@ -94,12 +94,25 @@ class Encoder(nn.Module):
 
         self.emb_size = emb_size
         # self.device = device
-        self.word_emb = nn.Embedding(vocab_size,emb_size)
+        if w2v == None:
+            self.word_emb = nn.Embedding(vocab_size,emb_size)
+        else:
+            self.word_emb = self.create_emb_layer(w2v, True)
         self.positional_emb = nn.Embedding(maxlength, emb_size)
 
         self.layers = nn.ModuleList([Transformer(emb_size, heads, dropout,mult) for _ in range(num_layers)])
 
         self.dropout = nn.Dropout(dropout)
+
+    def create_emb_layer(self, weights_matrix, non_trainable=False):
+        num_embeddings, embedding_dim = weights_matrix.size()
+        emb_layer = nn.Embedding(num_embeddings, embedding_dim)
+        emb_layer.load_state_dict(weights_matrix)
+        if non_trainable:
+            emb_layer.weight.requires_grad = False
+
+        return emb_layer
+
 
     def forward(self,x):
         N, seq_length = x.shape
