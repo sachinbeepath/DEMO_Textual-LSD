@@ -17,6 +17,7 @@ from nltk.stem import PorterStemmer
 import nltk
 import gensim.models.word2vec as w2v
 import multiprocessing
+import pickle
 
 clear = lambda: os.system('cls')
 
@@ -123,7 +124,7 @@ lyrics2vec.train(lyrics,total_words=n, epochs =15)
 lyrics2vec.save("lyrics2vec_model.w2v")
 lyrics2vec = w2v.Word2Vec.load("lyrics2vec_model.w2v")
 
-# vectors = lyrics2vec.wv.vectors # embeddings of all the words in the corpus
+vectors = lyrics2vec.wv.vectors # embeddings of all the words in the corpus
 
 ### Getting embeddings of words in our vocab ###
 
@@ -140,3 +141,6 @@ for i, word in enumerate(english.vocab):
         words_found += 1
     except KeyError:
         weights_matrix[i] = np.random.normal(scale=0.6, size=(1,EMBEDDING_SIZE))
+
+w2v_weights_matrix = weights_matrix.clone().detach().requires_grad_(True)
+torch.save(w2v_weights_matrix, 'w2v_weights.pkl',pickle_module= pickle)
