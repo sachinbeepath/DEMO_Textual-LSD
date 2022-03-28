@@ -1,0 +1,6 @@
+conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
+pip install numpy
+pip install pandas
+pip install scipy‑0.19.1‑cp34‑cp34m‑win32.whl
+pip install gensim‑2.3.0‑cp34‑cp34m‑win32.whl
+pip install pickle
