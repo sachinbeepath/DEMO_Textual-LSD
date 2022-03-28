@@ -8,11 +8,14 @@ import Transformer_aladdinpersson as trans_2
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class multitaskNet(nn.Module):
-    def __init__(self, hidden_size, sent_len, embed_len, dropout, device, vocab_size, num_layers, att_heads, mult, pad_idx, dom=True):
+    def __init__(self, hidden_size, sent_len, embed_len, dropout, device, vocab_size, num_layers, att_heads, mult, pad_idx, dom=True, w2v=None):
         super(multitaskNet, self).__init__()
         self.device = device
         self.pos_emb = nn.Embedding(sent_len, embed_len)
-        self.word_emb = nn.Embedding(vocab_size, embed_len, pad_idx)
+        if w2v is not None:
+            self.word_emb = w2v
+        else:
+            self.word_emb = nn.Embedding(vocab_size, embed_len, pad_idx)
         self.enc_manual = trans.Encoder(vocab_size, embed_len, num_layers, att_heads, mult, dropout, sent_len, device)
         self.enc_manual.double()
         self.enc_aladdin = trans_2.Encoder(vocab_size, embed_len, num_layers, att_heads, device, mult, dropout, sent_len)
