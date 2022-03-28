@@ -130,12 +130,13 @@ vectors = lyrics2vec.wv.vectors # embeddings of all the words in the corpus
 # end up w tensor of dim 6.5k x 32
 # building the matrix of weights to be loaded into pytorch embedding layer
 
-weights_matrix = np.zeros(VOCAB_LEN,EMBEDDING_SIZE)
+# vocab_size is the number of words in your dataset and vector_size is the dimension of the word vectors you are using.
+weights_matrix = np.zeros((VOCAB_LEN, EMBEDDING_SIZE))
 words_found = 0
 
 for i, word in enumerate(english.vocab):
     try:
-        weights_matrix[i] = lyrics2vec[word]
+        weights_matrix[i] = lyrics2vec.wv.__getitem__(word)
         words_found += 1
     except KeyError:
-        weights_matrix[i] = np.random.normal(scale=0.6, size=(EMBEDDING_SIZE,))
+        weights_matrix[i] = np.random.normal(scale=0.6, size=(1,EMBEDDING_SIZE))
