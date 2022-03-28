@@ -36,14 +36,6 @@ class multitaskNet(nn.Module):
         self.fc_dominance = nn.Linear(hidden_size, 2, bias=False)
         self.fc_quad = nn.Sequential(nn.ReLU(), nn.Linear(hidden_size, 4))
 
-    def create_emb_layer(self, weights_matrix, non_trainable=False):
-        num_embeddings, embedding_dim = weights_matrix.size()
-        emb_layer = nn.Embedding(num_embeddings, embedding_dim)
-        emb_layer.load_state_dict(weights_matrix)
-        if non_trainable:
-            emb_layer.weight.requires_grad = False
-        return emb_layer
-
     def forward(self, x, version):
         '''
         transformer needs to output dimension: BxLxHxE (sum out the embedding dim)
