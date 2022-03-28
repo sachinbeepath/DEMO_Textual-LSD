@@ -107,12 +107,10 @@ class Encoder(nn.Module):
     def create_emb_layer(self, weights_matrix, non_trainable=False):
         num_embeddings, embedding_dim = weights_matrix.size()
         emb_layer = nn.Embedding(num_embeddings, embedding_dim)
-        emb_layer.load_state_dict(weights_matrix)
+        emb_layer.weight.data = weights_matrix
         if non_trainable:
             emb_layer.weight.requires_grad = False
-
         return emb_layer
-
 
     def forward(self,x):
         N, seq_length = x.shape

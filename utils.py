@@ -181,15 +181,17 @@ class Textual_LSD_Training():
             print('Starting Load Vocab...')
         assert self.dataset is not None, 'Please load in a dataset before loading a vocabulary'
 
-        english = Vocabulary()
-        english.load(fname)
-        self.dataset.set_vocab(english)
+        self.vocab = Vocabulary()
+        self.vocab.load(fname)
+        self.dataset.set_vocab(self.vocab)
+        self.vocab_len = len(self.vocab)
+        self.pad_idx = self.vocab.pad_idx
         if self.verbose:
             print(f'Successfully Loaded {fname} into vocabulary')
         return
 
     def generate_models(self, emb_size, att_heads, drp, dom, lr, mt_heads, num_enc, 
-                        forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True):
+                        forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True, w2v=None):
         if self.verbose:
             print('Starting Generate Models...')
         assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
@@ -197,7 +199,7 @@ class Textual_LSD_Training():
 
         self.multitask = mtn.multitaskNet(mt_heads, self.max_length+2, emb_size, drp, dev, 
                                 self.vocab_len, num_enc, att_heads, forw_exp, 
-                                self.pad_idx, dom).to(dev)
+                                self.pad_idx, dom, w2v).to(dev)
         self.multitask.double()
 
         self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
@@ -239,7 +241,7 @@ class Textual_LSD_Training():
         return torch.tensor(quads)
 
     def train(self, epochs, print_step, save_step, save_name=None, 
-                show_preds=False, show_acc=True, show_loss=True, show_time=True):
+                show_preds=False, show_acc=True, show_loss=True, show_time=True, enc_version=1):
         if self.verbose:
             print(f'Number of batches per epoch: {len(self.dataloader)}')
             print(f'Printing every {print_step} batches, saving every {save_step} batches')
@@ -259,7 +261,7 @@ class Textual_LSD_Training():
                 aro = batch['arousal_tags'].long().to(self.device)
                 dom = batch['dominance_tags'].long().to(self.device)
                 quad = self.VA_to_quadrant(val, aro).to(self.device)
-                output, quad_pred = self.multitask(inp_data, version=0)
+                output, quad_pred = self.multitask(inp_data, version=enc_version)
                 self.optim.zero_grad()
                 
                 valence_loss = self.valence_L(output[0], val)
