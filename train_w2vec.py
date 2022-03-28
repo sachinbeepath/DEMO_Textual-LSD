@@ -120,12 +120,10 @@ lyrics2vec.build_vocab(lyrics)
 
 lyrics2vec.train(lyrics,total_words=n, epochs =15)
 
-if not os.path.exists("trained"):
-    os.makedirs("trained")
-lyrics2vec.save(os.path.join("trained", "lyrics2vec.w2v"))
-lyrics2vec = w2v.Word2Vec.load(os.path.join("trained", "lyrics2vec.w2v"))
+lyrics2vec.save("lyrics2vec_model.w2v")
+lyrics2vec = w2v.Word2Vec.load("lyrics2vec_model.w2v")
 
-vectors = lyrics2vec.wv.vectors # embeddings of all the words in the corpus
+# vectors = lyrics2vec.wv.vectors # embeddings of all the words in the corpus
 
 ### Getting embeddings of words in our vocab ###
 
