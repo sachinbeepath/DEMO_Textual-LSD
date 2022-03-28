@@ -1,4 +1,5 @@
-from tkinter import Y
+import sys
+print(sys.path)
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -13,7 +14,7 @@ import os
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import nltk
-import gensim.models.word2vec as w2v
+#import gensim
 import multiprocessing
 
 clear = lambda: os.system('cls')

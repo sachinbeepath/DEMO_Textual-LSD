@@ -157,6 +157,9 @@ class LSD_DataLoader(Dataset):
             if char_to_remove != []:
                 for remove, replace in zip(char_to_remove, replacement_chars):
                     sentence = sentence.replace(remove, replace)
+                sentence.replace('\n', ' ')
+                sentence = sentence.lower()
+                sentence = re.sub('[^a-z ]+', '', sentence)
             sentence = sentence.lower()
 
             if tokenize == False:
