@@ -424,10 +424,7 @@ class Textual_LSD_TVT():
         """
         
         if C.shape == (2,2):
-            TN = C[0,0]
-            TP = C[1,1]
-            FN = C[1,0]
-            FP = C[0,1]
+            TN,FP,FN,TP = C.ravel()
         else:
             TP = np.diag(C)
             FP = np.sum(C, axis=0) - TP
