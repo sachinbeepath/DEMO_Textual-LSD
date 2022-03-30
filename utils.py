@@ -475,7 +475,7 @@ class Textual_LSD_TVT():
             quad = quad.detach().cpu().numpy()
 
             self.__printc('Testing:')
-            print(f'{batch_idx / len(self.dataloader):.1f}% Complete')
+            print(f'{100 * batch_idx / len(self.dataloader):.1f}% Complete')
 
             correct_raw += sum(quad_pred_raw == quad)
             self.Cmat_raw += confusion_matrix(quad_pred_raw,quad,labels=labels)

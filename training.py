@@ -3,7 +3,7 @@ import utils
 
 ##### Key Variables #####
 # Hashed values are those used in the reference paper
-EPOCHS = 100 #Until convergence
+EPOCHS = 2 #Until convergence
 BATCH_SIZE = 64 # 8
 LR = 3e-3 #2e-5
 USE_DOM = True
@@ -21,14 +21,14 @@ print('Using ', DEVICE)
 PRINT_STEP = 50
 SAVE_STEP = 10
 
-w2v = torch.load('w2v_weights.pkl')
+#w2v = torch.load('w2v_weights.pkl')
 
 trainer = utils.Textual_LSD_TVT(verbose=True)
 trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
 trainer.load_vocab('vocab_emb64.pkl')
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
                         LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15)
-trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'Test.pt', enc_version=0)
+trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'Test.pt', enc_version=1)
 trainer.plot_data(averaging_window=1)
 
 

@@ -2,15 +2,15 @@ import torch
 import utils
 
 ##### Key Variables #####
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 USE_DOM = True
 FILENAME = '8500_songs_validation.xlsx' 
-ATTENTION_HEADS = 4
-EMBEDDING_SIZE = 64
+ATTENTION_HEADS = 8
+EMBEDDING_SIZE = 32
 NUM_ENCODER_LAYERS = 1
-FORWARD_XP = 32
-DROPOUT = 0.1
-MAXLENGTH = 256
+FORWARD_XP = 16
+DROPOUT = 0.25
+MAXLENGTH = 128
 MT_HEADS = 8
 LABEL_DICT = {'relaxed': 3, 'angry': 1, 'happy': 0, 'sad': 2}
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -23,7 +23,7 @@ trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
 trainer.load_vocab('vocab_emb64.pkl')
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
                         None, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15, train=False)
-trainer.load_models('model_name.pt', None, train=False)
+trainer.load_models('Test.pt', None, train=False)
 trainer.test()
 
 
