@@ -103,7 +103,7 @@ class Vocabulary():
         self.sos, self.eos, self.pad, self.sos_idx, self.eos_idx, self.pad_idx, self.vocab, self.frequencies = loadfile
         return
 
-class Textual_LSD_Training():
+class Textual_LSD_TVT():
     def __init__(self, verbose=False):
         self.verbose = verbose
         self.clear = lambda: os.system('cls')
