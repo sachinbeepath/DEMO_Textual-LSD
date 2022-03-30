@@ -104,10 +104,28 @@ class Vocabulary():
         return
 
 class Textual_LSD_TVT():
-    def __init__(self, verbose=False):
-        self.verbose = verbose
-        self.clear = lambda: os.system('cls')
+    '''
+    The Textual_LSD_TVT class allows for concise implementation of trainig, validation, 
+    and testing routines. In houses self-contained methods for loading in .xlsx datasets, 
+    creating and loading in vocabularies (utilising the custom Vocabulary class also in this utils file),
+    generating and loading in Textual_LSD models, as well as performing Training, Testing and Validation.
 
+    There are additional methods allowing for the retrieval of training and testing data such 
+    as accuracy, losses, precision, recall and F-scores etc., as well as plotting losses and accuracy
+    values from training. All key variables are initiated at instantiation, and can be retrieved explicitly 
+    by referencing them from their parent object (they will be set to None or empty arrays until they have 
+    values assigned to them by methods).
+    
+    '''
+    def __init__(self, verbose=False):
+        '''
+        verbose : bool - 
+        '''
+        # General
+        self.verbose = verbose
+        self.__clear = lambda: os.system('cls')
+
+        # Dataset loading
         self.dataset = None
         self.dataloader = None
         self.dataframe = None
@@ -115,10 +133,12 @@ class Textual_LSD_TVT():
         self.tokenizer = None
         self.max_length = None
 
+        # vocabulary loading
         self.vocab = None
         self.pad_idx = None
         self.vocab_len = None
 
+        # Model generating
         self.multitask = None
         self.optim = None
         self.scheduler = None
@@ -129,12 +149,14 @@ class Textual_LSD_TVT():
         self.device = None
         self.use_dom = None
 
+        # Training
         self.losses = []
         self.valpoints = []
         self.aropoints = []
         self.true_quads = []
         self.accuracy = []
 
+        # Testing
         self.acc_raw = None
         self.acc_am = None
         self.Cmat_raw = None
@@ -142,8 +164,8 @@ class Textual_LSD_TVT():
         self.Cmat_val = None
         self.Cmat_aro = None
 
-    def printc(self, t):
-        self.clear()
+    def __printc(self, t):
+        self.__clear()
         print(t)
         return
 
@@ -206,7 +228,27 @@ class Textual_LSD_TVT():
         return
 
     def generate_models(self, emb_size, att_heads, drp, dom, lr, mt_heads, num_enc, 
-                        forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True, w2v=None):
+                        forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True, w2v=None, train=True):
+        '''
+        Generates a new network model with random weights
+
+        Parameters
+        ---------------
+        emb_size : int - size of embedding vectors to generate
+        att_heads : int - number of attention heads (emb_size % att_heads = 0)
+        drp : float 0-1 - dropout fraction
+        dom : bool - whether to use Dominance dimension in model
+        lr : float - learning rate
+        mt_heads : int - number of feature layers to generate in final multitask stage
+        num_enc : int - number of encoder layers to use
+        forw_exp : int - forward expansion rate in feed-forward layer
+        dev : Cuda.Device - CPU or GPU
+        lr_fact : float - learning rate multiplyer in LR Scheduler
+        lr_pat : int - learning rate scheduler patience
+        lr_verbose : bool - learning rate scheduler set verbose value
+        w2v : torch.Tensor - Tensor containing Word2Vec embedding weights. This will replace the nn.Embedding weights if not set to None
+        train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
+        '''
         if self.verbose:
             print('Starting Generate Models...')
         assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
@@ -217,25 +259,40 @@ class Textual_LSD_TVT():
                                 self.pad_idx, dom, w2v).to(dev)
         self.multitask.double()
 
-        self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+        if train:
+            self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
 
-        self.valence_L = nn.CrossEntropyLoss()
-        self.arousal_L = nn.CrossEntropyLoss()
-        self.dominance_L = nn.CrossEntropyLoss()
-        self.quad_L = nn.CrossEntropyLoss()
+            self.valence_L = nn.CrossEntropyLoss()
+            self.arousal_L = nn.CrossEntropyLoss()
+            self.dominance_L = nn.CrossEntropyLoss()
+            self.quad_L = nn.CrossEntropyLoss()
+
         self.device = dev
         self.use_dom = dom
         if self.verbose:
-            print('Models Generated...')
+            print('Models Generated Successfully')
         return 
 
-    def load_models(self, fname, lr, lr_fact=0.2, lr_pat=10, lr_verbose=True):
+    def load_models(self, fname, lr, lr_fact=0.2, lr_pat=10, lr_verbose=True, train=True):
+        '''
+        Loads in a pretrained model
+
+        Parameters
+        ----------------
+        fname : string - filename of model state-dict to be loaded (including .pt)
+        lr : learning rate to use
+        lr_fact : float - learning rate multiplyer in LR Scheduler
+        lr_pat : int - learning rate scheduler patience
+        lr_verbose : bool - learning rate scheduler set verbose value
+        train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
+        '''
         if self.verbose:
             print('Starting Load Models...')
         self.multitask.load_state_dict(torch.load(fname, map_location=self.device))
-        self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+        if train:
+            self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
         if self.verbose:
             print('Models Loaded')
         return
@@ -257,6 +314,21 @@ class Textual_LSD_TVT():
 
     def train(self, epochs, print_step, save_step, save_name=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, enc_version=1):
+        '''
+        Trains the network
+
+        Parameters
+        --------------
+        epochs : int - number of epochs to train
+        print_step : int - print data every N batches (averaged since previous print)
+        save_step : int - save data every N batches (averaged since previous save)
+        save_name : string - filename to save model under (including .pt)
+        show_preds : bool - whether to print predictions on print_step
+        show_acc : bool - whether to print accuracy on print_step
+        show_loss : bool - whether to print loss on print_step
+        show_time : bool - whether to print the time taken per epoch
+        enc_version : binary - 0=Pytorch implementation of transformer, 1=Manually coded transformer
+        '''
         if self.verbose:
             print(f'Number of batches per epoch: {len(self.dataloader)}')
             print(f'Printing every {print_step} batches, saving every {save_step} batches')
@@ -304,6 +376,8 @@ class Textual_LSD_TVT():
                         print('Quadrant pred/true', np.argmax(quad_pred.detach().cpu().numpy(), axis=1), quad.detach().cpu().numpy())
                     if show_loss:
                         print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
+                    if show_acc:
+                        print(f'Batch Accuracy: {100 * correct / total:.2f}%')
 
                 if (batch_idx + 1) % save_step == 0:
                     self.losses.append(np.average(epoch_l[-save_step:]))
@@ -366,6 +440,11 @@ class Textual_LSD_TVT():
         return precision, recall, f_score
 
     def test(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True):
+        '''
+        Performs and evaluation run on the dataset, recording accuracy, confusion matrices and Precision/Recall/F-score.
+        enc_version : 0 or 1 - 0 -> pytorch implementation of transformer, 1 -> manually-coded transformer
+        prnt_... : Bool - whether to print the specified statistic at the end of testing
+        '''
         self.test_losses = []
         # Testing Loop
         self.multitask.eval()
@@ -379,9 +458,6 @@ class Textual_LSD_TVT():
 
         self.Cmat_val = np.zeros((2,2))
         self.Cmat_aro = np.zeros((2,2))
-
-        quad_predictions = []
-        predictions = []
 
         labels = [0,1,2,3]
 
@@ -398,7 +474,7 @@ class Textual_LSD_TVT():
             quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
             quad = quad.detach().cpu().numpy()
 
-            self.princt('Testing:')
+            self.__printc('Testing:')
             print(f'{batch_idx / len(self.dataloader):.1f}% Complete')
 
             correct_raw += sum(quad_pred_raw == quad)
@@ -437,6 +513,9 @@ class Textual_LSD_TVT():
 
                 
     def return_train_values(self, losses=True, acc=False, val_preds=False, aro_preds=False):
+        '''
+        returns the values set to true from training.
+        '''
         returns = []
         if losses:
             returns.append(self.losses)
@@ -449,6 +528,9 @@ class Textual_LSD_TVT():
         return tuple(returns)
 
     def return_test_values(self, acc=True, cm=True, prf=True):
+        '''
+        returns the values set to true from testing/validation.
+        '''
         p_raw, r_raw, f_raw = self.p_r_f(self.Cmat_raw)
         p_am, r_am, f_am = self.p_r_f(self.Cmat_am)
         p_val, r_val, f_val = self.p_r_f(self.Cmat_val)
@@ -461,6 +543,10 @@ class Textual_LSD_TVT():
         return tuple(out[i] for i in ind[0][:])
 
     def plot_data(self, averaging_window=20):
+        '''
+        Plots losses and accuracy.
+        averaging_window : int - size of moving average frame
+        '''
         w = np.ones(averaging_window) / averaging_window
         fig, axs = plt.subplots(2)
         axs[0].plot(np.convolve(self.losses[averaging_window:-averaging_window], w))
@@ -469,9 +555,6 @@ class Textual_LSD_TVT():
         axs[1].set_title('Quadrant Prediction Accuracy')
         plt.show()
         return
-
-
-
 
 
 def generate_test_val(dataframe, split, fnames, type='excel'):
