@@ -12,6 +12,8 @@ import torch.nn as nn
 import torch.optim as optim
 import multitaskNet as mtn
 import matplotlib.pyplot as plt
+import os
+from sklearn.metrics import confusion_matrix
 
 class Vocabulary():
     def __init__(self, start_token='<SOS>', end_token='<EOS>', pad_token='<PAD>'):
@@ -101,10 +103,29 @@ class Vocabulary():
         self.sos, self.eos, self.pad, self.sos_idx, self.eos_idx, self.pad_idx, self.vocab, self.frequencies = loadfile
         return
 
-class Textual_LSD_Training():
-    def __init__(self, verbose=False):
-        self.verbose = verbose
+class Textual_LSD_TVT():
+    '''
+    The Textual_LSD_TVT class allows for concise implementation of trainig, validation, 
+    and testing routines. In houses self-contained methods for loading in .xlsx datasets, 
+    creating and loading in vocabularies (utilising the custom Vocabulary class also in this utils file),
+    generating and loading in Textual_LSD models, as well as performing Training, Testing and Validation.
 
+    There are additional methods allowing for the retrieval of training and testing data such 
+    as accuracy, losses, precision, recall and F-scores etc., as well as plotting losses and accuracy
+    values from training. All key variables are initiated at instantiation, and can be retrieved explicitly 
+    by referencing them from their parent object (they will be set to None or empty arrays until they have 
+    values assigned to them by methods).
+    
+    '''
+    def __init__(self, verbose=False):
+        '''
+        verbose : bool - 
+        '''
+        # General
+        self.verbose = verbose
+        self.__clear = lambda: os.system('cls')
+
+        # Dataset loading
         self.dataset = None
         self.dataloader = None
         self.dataframe = None
@@ -112,10 +133,12 @@ class Textual_LSD_Training():
         self.tokenizer = None
         self.max_length = None
 
+        # vocabulary loading
         self.vocab = None
         self.pad_idx = None
         self.vocab_len = None
 
+        # Model generating
         self.multitask = None
         self.optim = None
         self.scheduler = None
@@ -126,11 +149,25 @@ class Textual_LSD_Training():
         self.device = None
         self.use_dom = None
 
+        # Training
         self.losses = []
         self.valpoints = []
         self.aropoints = []
         self.true_quads = []
         self.accuracy = []
+
+        # Testing
+        self.acc_raw = None
+        self.acc_am = None
+        self.Cmat_raw = None
+        self.Cmat_am = None
+        self.Cmat_val = None
+        self.Cmat_aro = None
+
+    def __printc(self, t):
+        self.__clear()
+        print(t)
+        return
 
     def load_dataset(self, fname, max_length, batch_size, lyric_col='lyrics', 
                         label_cols = ['valence_tags', 'arousal_tags', 'dominance_tags'], 
@@ -191,7 +228,27 @@ class Textual_LSD_Training():
         return
 
     def generate_models(self, emb_size, att_heads, drp, dom, lr, mt_heads, num_enc, 
-                        forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True, w2v=None):
+                        forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True, w2v=None, train=True):
+        '''
+        Generates a new network model with random weights
+
+        Parameters
+        ---------------
+        emb_size : int - size of embedding vectors to generate
+        att_heads : int - number of attention heads (emb_size % att_heads = 0)
+        drp : float 0-1 - dropout fraction
+        dom : bool - whether to use Dominance dimension in model
+        lr : float - learning rate
+        mt_heads : int - number of feature layers to generate in final multitask stage
+        num_enc : int - number of encoder layers to use
+        forw_exp : int - forward expansion rate in feed-forward layer
+        dev : Cuda.Device - CPU or GPU
+        lr_fact : float - learning rate multiplyer in LR Scheduler
+        lr_pat : int - learning rate scheduler patience
+        lr_verbose : bool - learning rate scheduler set verbose value
+        w2v : torch.Tensor - Tensor containing Word2Vec embedding weights. This will replace the nn.Embedding weights if not set to None
+        train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
+        '''
         if self.verbose:
             print('Starting Generate Models...')
         assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
@@ -202,25 +259,40 @@ class Textual_LSD_Training():
                                 self.pad_idx, dom, w2v).to(dev)
         self.multitask.double()
 
-        self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+        if train:
+            self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
 
-        self.valence_L = nn.CrossEntropyLoss()
-        self.arousal_L = nn.CrossEntropyLoss()
-        self.dominance_L = nn.CrossEntropyLoss()
-        self.quad_L = nn.CrossEntropyLoss()
+            self.valence_L = nn.CrossEntropyLoss()
+            self.arousal_L = nn.CrossEntropyLoss()
+            self.dominance_L = nn.CrossEntropyLoss()
+            self.quad_L = nn.CrossEntropyLoss()
+
         self.device = dev
         self.use_dom = dom
         if self.verbose:
-            print('Models Generated...')
+            print('Models Generated Successfully')
         return 
 
-    def load_models(self, fname, lr, lr_fact=0.2, lr_pat=10, lr_verbose=True):
+    def load_models(self, fname, lr, lr_fact=0.2, lr_pat=10, lr_verbose=True, train=True):
+        '''
+        Loads in a pretrained model
+
+        Parameters
+        ----------------
+        fname : string - filename of model state-dict to be loaded (including .pt)
+        lr : learning rate to use
+        lr_fact : float - learning rate multiplyer in LR Scheduler
+        lr_pat : int - learning rate scheduler patience
+        lr_verbose : bool - learning rate scheduler set verbose value
+        train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
+        '''
         if self.verbose:
             print('Starting Load Models...')
         self.multitask.load_state_dict(torch.load(fname, map_location=self.device))
-        self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+        if train:
+            self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
         if self.verbose:
             print('Models Loaded')
         return
@@ -242,6 +314,21 @@ class Textual_LSD_Training():
 
     def train(self, epochs, print_step, save_step, save_name=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, enc_version=1):
+        '''
+        Trains the network
+
+        Parameters
+        --------------
+        epochs : int - number of epochs to train
+        print_step : int - print data every N batches (averaged since previous print)
+        save_step : int - save data every N batches (averaged since previous save)
+        save_name : string - filename to save model under (including .pt)
+        show_preds : bool - whether to print predictions on print_step
+        show_acc : bool - whether to print accuracy on print_step
+        show_loss : bool - whether to print loss on print_step
+        show_time : bool - whether to print the time taken per epoch
+        enc_version : binary - 0=Pytorch implementation of transformer, 1=Manually coded transformer
+        '''
         if self.verbose:
             print(f'Number of batches per epoch: {len(self.dataloader)}')
             print(f'Printing every {print_step} batches, saving every {save_step} batches')
@@ -289,6 +376,8 @@ class Textual_LSD_Training():
                         print('Quadrant pred/true', np.argmax(quad_pred.detach().cpu().numpy(), axis=1), quad.detach().cpu().numpy())
                     if show_loss:
                         print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
+                    if show_acc:
+                        print(f'Batch Accuracy: {100 * correct / total:.2f}%')
 
                 if (batch_idx + 1) % save_step == 0:
                     self.losses.append(np.average(epoch_l[-save_step:]))
@@ -315,9 +404,115 @@ class Textual_LSD_Training():
                     print(f'Successfully saved model weights as {name}')
             else:
                 print(f'Training Compeleted. Total time: {time.time() - t_0:.0f}s')
-        return 
+        return
+
+    def ArgMax_to_quadrant(self, V, A):
+        '''
+        Takes in the argmaxes for valence and arousal
+        1 = positive, 0 = negative  
+        '''
+        quads = []
+        d = {'0,0':2, '0,1':1, '1,1':0, '1,0':3}
+        for v, a in zip(V, A):
+            a = f'{int(v)},{int(a)}'
+            quads.append(d[a])
+        return torch.tensor(quads)
+
+    def p_r_f(self, C):
+        """
+        Calculates precision, recall and f-score from a confusion matrix
+        """
         
-    def return_values(self, losses=True, acc=False, val_preds=False, aro_preds=False):
+        if C.shape == (2,2):
+            TN,FP,FN,TP = C.ravel()
+        else:
+            TP = np.diag(C)
+            FP = np.sum(C, axis=0) - TP
+            FN = np.sum(C, axis=1) - TP
+
+        precision = TP/(TP+FP)
+        recall = TP/(TP+FN)
+        f_score = 2*precision*recall/(precision+recall)
+        
+        return precision, recall, f_score
+
+    def test(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True):
+        '''
+        Performs and evaluation run on the dataset, recording accuracy, confusion matrices and Precision/Recall/F-score.
+        enc_version : 0 or 1 - 0 -> pytorch implementation of transformer, 1 -> manually-coded transformer
+        prnt_... : Bool - whether to print the specified statistic at the end of testing
+        '''
+        self.test_losses = []
+        # Testing Loop
+        self.multitask.eval()
+        total = 0
+        correct_raw = 0
+        correct_am = 0
+
+        #confusion matrix
+        self.Cmat_raw = np.zeros((4,4))
+        self.Cmat_am = np.zeros((4,4))
+
+        self.Cmat_val = np.zeros((2,2))
+        self.Cmat_aro = np.zeros((2,2))
+
+        labels = [0,1,2,3]
+
+        for batch_idx, batch in enumerate(self.dataloader):
+            inp_data = batch['lyrics'].to(self.device)
+            val = batch['valence_tags'].long().to(self.device)
+            aro = batch['arousal_tags'].long().to(self.device)
+            dom = batch['dominance_tags'].long().to(self.device)
+            quad = self.VA_to_quadrant(val, aro).to(self.device)
+            output, quad_pred_raw = self.multitask(inp_data, version=enc_version)
+            val_pred = torch.argmax(output[0], dim=1)
+            aro_pred = torch.argmax(output[1], dim=1)
+            quad_pred_am = self.ArgMax_to_quadrant(val_pred, aro_pred).numpy()
+            quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
+            quad = quad.detach().cpu().numpy()
+
+            self.__printc('Testing:')
+            print(f'{100 * batch_idx / len(self.dataloader):.1f}% Complete')
+
+            correct_raw += sum(quad_pred_raw == quad)
+            self.Cmat_raw += confusion_matrix(quad_pred_raw,quad,labels=labels)
+            
+            correct_am += sum(quad_pred_am == quad)
+            self.Cmat_am += confusion_matrix(quad_pred_am,quad,labels=labels)
+            total += inp_data.shape[0]
+            
+            self.Cmat_val += confusion_matrix(val_pred.cpu(),val.cpu(),labels=[0,1])
+            self.Cmat_aro += confusion_matrix(aro_pred.cpu(),aro.cpu(),labels=[0,1])
+
+        p_raw, r_raw, f_raw = self.p_r_f(self.Cmat_raw)
+        p_am, r_am, f_am = self.p_r_f(self.Cmat_am)
+        p_val, r_val, f_val = self.p_r_f(self.Cmat_val)
+        p_aro, r_aro, f_aro = self.p_r_f(self.Cmat_aro)
+
+        self.acc_raw = 100 * correct_raw / total
+        self.acc_am = 100 * correct_am / total
+
+        if prnt_acc:
+            print(f'Accuracy of base quadrant predictions: {100 * correct_raw / total:.4f}%')
+            print(f'Accuracy of VA quadrant predictions: {100 * correct_am / total:.4f}%')
+        if prnt_cm:
+            print('Confusion matrix of base quadrant predictions:',self.Cmat_raw)
+            print('Confusion matrix of VA quadrant predictions:',self.Cmat_am)
+            print('Confusion matrix of valence predictions:',self.Cmat_val)
+            print('Confusion matrix of arousal predictions:',self.Cmat_aro)
+        if prnt_prf:
+            print('Per-label precision, recall, and f-score of base quadrant predictions: {},{},{}'.format(np.round(p_raw,3),np.round(r_raw,3),np.round(f_raw,3)))
+            print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
+            print('Precision, recall, and f-score valence predictions: {},{},{}'.format(round(p_val,3),round(r_val,3),round(f_val,3)))
+            print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
+        
+        return
+
+                
+    def return_train_values(self, losses=True, acc=False, val_preds=False, aro_preds=False):
+        '''
+        returns the values set to true from training.
+        '''
         returns = []
         if losses:
             returns.append(self.losses)
@@ -329,7 +524,26 @@ class Textual_LSD_Training():
             returns.append(self.aropoints)
         return tuple(returns)
 
+    def return_test_values(self, acc=True, cm=True, prf=True):
+        '''
+        returns the values set to true from testing/validation.
+        '''
+        p_raw, r_raw, f_raw = self.p_r_f(self.Cmat_raw)
+        p_am, r_am, f_am = self.p_r_f(self.Cmat_am)
+        p_val, r_val, f_val = self.p_r_f(self.Cmat_val)
+        p_aro, r_aro, f_aro = self.p_r_f(self.Cmat_aro)
+        
+        out = ([self.acc_raw, self.acc_raw], [self.Cmat_raw, self.Cmat_am, self.Cmat_val, self.Cmat_aro], 
+                [[p_raw, r_raw, f_raw], [p_am, r_am, f_am], [p_val, r_val, f_val], [p_aro, r_aro, f_aro]])
+
+        ind = np.where(np.array([acc, cm, prf]) * 1 == 1)
+        return tuple(out[i] for i in ind[0][:])
+
     def plot_data(self, averaging_window=20):
+        '''
+        Plots losses and accuracy.
+        averaging_window : int - size of moving average frame
+        '''
         w = np.ones(averaging_window) / averaging_window
         fig, axs = plt.subplots(2)
         axs[0].plot(np.convolve(self.losses[averaging_window:-averaging_window], w))
@@ -338,9 +552,6 @@ class Textual_LSD_Training():
         axs[1].set_title('Quadrant Prediction Accuracy')
         plt.show()
         return
-
-
-
 
 
 def generate_test_val(dataframe, split, fnames, type='excel'):

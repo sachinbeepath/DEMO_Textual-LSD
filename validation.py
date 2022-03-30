@@ -1,94 +1,36 @@
-from tkinter import Y
 import torch
-import torch.optim as optim
-import torch.nn as nn
-from torch.utils.data import DataLoader, Subset
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import time
-import argparse
 import utils
-import os
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
-
-clear = lambda: os.system('cls')
-
-def printc(text):
-    clear()
-    print(text)
-    return
-
-import dataloader as dl
-import transformer as tr
-import multitaskNet as mtn
-
-def VA_to_quadrant(V, A):
-    quads = []
-    for v, a in zip(V, A):
-        if v > 0:
-            if a > 0:
-                quads.append(0)
-            else:
-                quads.append(3)
-        else:
-            if a > 0:
-                quads.append(1)
-            else:
-                quads.append(2)
-    return torch.tensor(quads)
-
-def ArgMax_to_quadrant(V, A):
-    '''
-    Takes in the argmaxes for valence and arousal
-    1 = positive, 0 = negative  
-    '''
-    quads = []
-    d = {'0,0':2, '0,1':1, '1,1':0, '1,0':3}
-    for v, a in zip(V, A):
-        a = f'{int(v)},{int(a)}'
-        quads.append(d[a])
-    return torch.tensor(quads)
-
-def p_r_f(C):
-    """
-    Calculates precision, recall and f-score from a confusion matrix
-    """
-    
-    if C.shape == (2,2):
-        TN = C[0,0]
-        TP = C[1,1]
-        FN = C[1,0]
-        FP = C[0,1]
-    else:
-        TP = np.diag(C)
-        FP = np.sum(C, axis=0) - TP
-        FN = np.sum(C, axis=1) - TP
-
-    precision = TP/(TP+FP)
-    recall = TP/(TP+FN)
-    f_score = 2*precision*recall/(precision+recall)
-    
-    return precision, recall, f_score
 
 ##### Key Variables #####
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 USE_DOM = True
 FILENAME = '8500_songs_validation.xlsx' 
-ATTENTION_HEADS = 4
-EMBEDDING_SIZE = 64
+ATTENTION_HEADS = 8
+EMBEDDING_SIZE = 32
 NUM_ENCODER_LAYERS = 1
-FORWARD_XP = 32
-DROPOUT = 0.1
-MAXLENGTH = 256
+FORWARD_XP = 16
+DROPOUT = 0.25
+MAXLENGTH = 128
 MT_HEADS = 8
 LABEL_DICT = {'relaxed': 3, 'angry': 1, 'happy': 0, 'sad': 2}
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 PRINT_STEP = 10
 SAVE_STEP = 5   
+
+trainer = utils.Textual_LSD_TVT(verbose=True)
+trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
+trainer.load_vocab('vocab_emb64.pkl')
+trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
+                        None, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15, train=False)
+trainer.load_models('Test.pt', None, train=False)
+trainer.test()
+
+
+
+
+
+'''
 TRAIN_VAL_SPLIT = 0.8
 
 ##### Load Data into Dataset#####
@@ -100,9 +42,6 @@ stemmer = lambda x: ps.stem(x)
 dataset = dl.LSD_DataLoader(dataframe, 'lyrics', ['valence_tags', 'arousal_tags', 'dominance_tags'], MAXLENGTH)
 dataset.scale_VAD_scores(5, 5)
 dataset.clean_lyrics(remove_between_brackets=True, stem=True, stemmer=stemmer, tokenize=True, tokenizer=word_tokenize, length=MAXLENGTH)
-idx = np.arange(0, len(dataset), 1)
-np.random.shuffle(idx)
-
 
 ##### Vocab work #####
 printc('Creating vocabulary from training data...')
@@ -113,7 +52,6 @@ VOCAB_LEN = len(english)
 dataset.set_vocab(english)
 
 ##### Create Dataloaders #####
-
 dataloader_val = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 ##### Prepare Model, Optimizer and Criterion #####
@@ -140,8 +78,6 @@ Cmat_am = np.zeros((4,4))
 Cmat_val = np.zeros((2,2))
 Cmat_aro = np.zeros((2,2))
 
-quad_predictions = []
-predictions = []
 
 labels = [0,1,2,3]
 
@@ -196,4 +132,4 @@ print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{
 print('Precision, recall, and f-score valence predictions: {},{},{}'.format(round(p_val,3),round(r_val,3),round(f_val,3)))
 print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
 
-
+'''
