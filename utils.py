@@ -12,6 +12,8 @@ import torch.nn as nn
 import torch.optim as optim
 import multitaskNet as mtn
 import matplotlib.pyplot as plt
+import os
+from sklearn.metrics import confusion_matrix
 
 class Vocabulary():
     def __init__(self, start_token='<SOS>', end_token='<EOS>', pad_token='<PAD>'):
@@ -104,6 +106,7 @@ class Vocabulary():
 class Textual_LSD_Training():
     def __init__(self, verbose=False):
         self.verbose = verbose
+        self.clear = lambda: os.system('cls')
 
         self.dataset = None
         self.dataloader = None
@@ -131,6 +134,18 @@ class Textual_LSD_Training():
         self.aropoints = []
         self.true_quads = []
         self.accuracy = []
+
+        self.acc_raw = None
+        self.acc_am = None
+        self.Cmat_raw = None
+        self.Cmat_am = None
+        self.Cmat_val = None
+        self.Cmat_aro = None
+
+    def printc(self, t):
+        self.clear()
+        print(t)
+        return
 
     def load_dataset(self, fname, max_length, batch_size, lyric_col='lyrics', 
                         label_cols = ['valence_tags', 'arousal_tags', 'dominance_tags'], 
@@ -315,9 +330,113 @@ class Textual_LSD_Training():
                     print(f'Successfully saved model weights as {name}')
             else:
                 print(f'Training Compeleted. Total time: {time.time() - t_0:.0f}s')
-        return 
+        return
+
+    def ArgMax_to_quadrant(self, V, A):
+        '''
+        Takes in the argmaxes for valence and arousal
+        1 = positive, 0 = negative  
+        '''
+        quads = []
+        d = {'0,0':2, '0,1':1, '1,1':0, '1,0':3}
+        for v, a in zip(V, A):
+            a = f'{int(v)},{int(a)}'
+            quads.append(d[a])
+        return torch.tensor(quads)
+
+    def p_r_f(self, C):
+        """
+        Calculates precision, recall and f-score from a confusion matrix
+        """
         
-    def return_values(self, losses=True, acc=False, val_preds=False, aro_preds=False):
+        if C.shape == (2,2):
+            TN = C[0,0]
+            TP = C[1,1]
+            FN = C[1,0]
+            FP = C[0,1]
+        else:
+            TP = np.diag(C)
+            FP = np.sum(C, axis=0) - TP
+            FN = np.sum(C, axis=1) - TP
+
+        precision = TP/(TP+FP)
+        recall = TP/(TP+FN)
+        f_score = 2*precision*recall/(precision+recall)
+        
+        return precision, recall, f_score
+
+    def test(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True):
+        self.test_losses = []
+        # Testing Loop
+        self.multitask.eval()
+        total = 0
+        correct_raw = 0
+        correct_am = 0
+
+        #confusion matrix
+        self.Cmat_raw = np.zeros((4,4))
+        self.Cmat_am = np.zeros((4,4))
+
+        self.Cmat_val = np.zeros((2,2))
+        self.Cmat_aro = np.zeros((2,2))
+
+        quad_predictions = []
+        predictions = []
+
+        labels = [0,1,2,3]
+
+        for batch_idx, batch in enumerate(self.dataloader):
+            inp_data = batch['lyrics'].to(self.device)
+            val = batch['valence_tags'].long().to(self.device)
+            aro = batch['arousal_tags'].long().to(self.device)
+            dom = batch['dominance_tags'].long().to(self.device)
+            quad = self.VA_to_quadrant(val, aro).to(self.device)
+            output, quad_pred_raw = self.multitask(inp_data, version=enc_version)
+            val_pred = torch.argmax(output[0], dim=1)
+            aro_pred = torch.argmax(output[1], dim=1)
+            quad_pred_am = self.ArgMax_to_quadrant(val_pred, aro_pred).numpy()
+            quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
+            quad = quad.detach().cpu().numpy()
+
+            self.princt('Testing:')
+            print(f'{batch_idx / len(self.dataloader):.1f}% Complete')
+
+            correct_raw += sum(quad_pred_raw == quad)
+            self.Cmat_raw += confusion_matrix(quad_pred_raw,quad,labels=labels)
+            
+            correct_am += sum(quad_pred_am == quad)
+            self.Cmat_am += confusion_matrix(quad_pred_am,quad,labels=labels)
+            total += inp_data.shape[0]
+            
+            self.Cmat_val += confusion_matrix(val_pred.cpu(),val.cpu(),labels=[0,1])
+            self.Cmat_aro += confusion_matrix(aro_pred.cpu(),aro.cpu(),labels=[0,1])
+
+        p_raw, r_raw, f_raw = self.p_r_f(self.Cmat_raw)
+        p_am, r_am, f_am = self.p_r_f(self.Cmat_am)
+        p_val, r_val, f_val = self.p_r_f(self.Cmat_val)
+        p_aro, r_aro, f_aro = self.p_r_f(self.Cmat_aro)
+
+        self.acc_raw = 100 * correct_raw / total
+        self.acc_am = 100 * correct_am / total
+
+        if prnt_acc:
+            print(f'Accuracy of base quadrant predictions: {100 * correct_raw / total:.4f}%')
+            print(f'Accuracy of VA quadrant predictions: {100 * correct_am / total:.4f}%')
+        if prnt_cm:
+            print('Confusion matrix of base quadrant predictions:',self.Cmat_raw)
+            print('Confusion matrix of VA quadrant predictions:',self.Cmat_am)
+            print('Confusion matrix of valence predictions:',self.Cmat_val)
+            print('Confusion matrix of arousal predictions:',self.Cmat_aro)
+        if prnt_prf:
+            print('Per-label precision, recall, and f-score of base quadrant predictions: {},{},{}'.format(np.round(p_raw,3),np.round(r_raw,3),np.round(f_raw,3)))
+            print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
+            print('Precision, recall, and f-score valence predictions: {},{},{}'.format(round(p_val,3),round(r_val,3),round(f_val,3)))
+            print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
+        
+        return
+
+                
+    def return_train_values(self, losses=True, acc=False, val_preds=False, aro_preds=False):
         returns = []
         if losses:
             returns.append(self.losses)
@@ -328,6 +447,18 @@ class Textual_LSD_Training():
         if aro_preds:
             returns.append(self.aropoints)
         return tuple(returns)
+
+    def return_test_values(self, acc=True, cm=True, prf=True):
+        p_raw, r_raw, f_raw = self.p_r_f(self.Cmat_raw)
+        p_am, r_am, f_am = self.p_r_f(self.Cmat_am)
+        p_val, r_val, f_val = self.p_r_f(self.Cmat_val)
+        p_aro, r_aro, f_aro = self.p_r_f(self.Cmat_aro)
+        
+        out = ([self.acc_raw, self.acc_raw], [self.Cmat_raw, self.Cmat_am, self.Cmat_val, self.Cmat_aro], 
+                [[p_raw, r_raw, f_raw], [p_am, r_am, f_am], [p_val, r_val, f_val], [p_aro, r_aro, f_aro]])
+
+        ind = np.where(np.array([acc, cm, prf]) * 1 == 1)
+        return tuple(out[i] for i in ind[0][:])
 
     def plot_data(self, averaging_window=20):
         w = np.ones(averaging_window) / averaging_window
