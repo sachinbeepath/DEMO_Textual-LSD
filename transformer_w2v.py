@@ -15,9 +15,9 @@ class MultiHeadAttention(nn.Module):
         self.heads = heads
         self.heads_dim = emb // heads
 
-        self.queries = nn.Linear(self.emb, self.emb, bias=False)
-        self.keys = nn.Linear(self.emb, self.emb, bias=False)
-        self.values = nn.Linear(self.emb, self.emb, bias=False)
+        #self.queries = nn.Linear(self.emb, self.emb, bias=False)
+        #self.keys = nn.Linear(self.emb, self.emb, bias=False)
+        #self.values = nn.Linear(self.emb, self.emb, bias=False)
         self.Wq = nn.Linear(self.heads_dim, self.heads_dim, bias=False)
         self.Wv = nn.Linear(self.heads_dim, self.heads_dim, bias=False)
         self.Wk = nn.Linear(self.heads_dim, self.heads_dim, bias=False)
@@ -34,10 +34,16 @@ class MultiHeadAttention(nn.Module):
         queries = self.queries(X)
         keys = self.keys(X)
         values = self.values(X)
-        # data = X.view(b,n,self.heads,self.heads_dim)
-        queries = queries.reshape(b, n, self.heads, self.heads_dim)
-        keys = keys.reshape(b, n, self.heads, self.heads_dim)
-        values = values.reshape(b, n, self.heads, self.heads_dim)
+
+        #queries = queries.reshape(b, n, self.heads, self.heads_dim)
+        #keys = keys.reshape(b, n, self.heads, self.heads_dim)
+        #values = values.reshape(b, n, self.heads, self.heads_dim)
+        
+        data = X.view(b,n,self.heads,self.heads_dim)
+        
+        q = self.Wq(data) #(b,n,heads,heads_dim)
+        v = self.Wv(data) #(b,n,heads,heads_dim)
+        k = self.Wk(data) #(b,n,heads,heads_dim)
 
         q = self.Wq(queries)  # (b,n,heads,heads_dim)
         v = self.Wv(values)  # (b,n,heads,heads_dim)

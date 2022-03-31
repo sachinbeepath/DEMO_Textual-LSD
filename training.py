@@ -28,16 +28,25 @@ print(w2v.shape)
 trainer = utils.Textual_LSD_TVT(verbose=True)
 trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
 trainer.load_vocab('vocab_emb64.pkl')
+<<<<<<< HEAD
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
                         LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=25)
 trainer.load_models('Previous_40epoch_settings_25drp.pt', None, train=False)
 trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'nodomtest.pt', enc_version=1)
+=======
+trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM,
+                        LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15)
+trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'Test.pt', enc_version=1)
+>>>>>>> 9a4966a128d2cafaac6b94e604dc103e7a326b23
 trainer.plot_data(averaging_window=1)
 
 
 
 
 
+<<<<<<< HEAD
 
 
 
+=======
+>>>>>>> 9a4966a128d2cafaac6b94e604dc103e7a326b23

@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import multitaskNet as mtn
 import matplotlib.pyplot as plt
+from imblearn.over_sampling import RandomOverSampler
 import os
 from sklearn.metrics import confusion_matrix
 
@@ -432,10 +433,7 @@ class Textual_LSD_TVT():
         """
         
         if C.shape == (2,2):
-            TN = C[0,0]
-            TP = C[1,1]
-            FN = C[1,0]
-            FP = C[0,1]
+            TN,FP,FN,TP = C.ravel()
         else:
             TP = np.diag(C)
             FP = np.sum(C, axis=0) - TP
@@ -572,8 +570,21 @@ class Textual_LSD_TVT():
         plt.show()
         return
 
+def get_quad(df,A_thresh=5,V_thresh=5):
+    """Returns quadrant given VAD scores"""
+    valence = df['valence_tags']
+    arousal = df['arousal_tags']
+    if arousal>A_thresh and valence>V_thresh:
+        return 'UR'
+    elif arousal>A_thresh and valence<=V_thresh:
+        return 'UL'
+    elif arousal<=A_thresh and valence<=V_thresh:
+        return 'LL'
+    elif arousal<=A_thresh and valence>V_thresh:
+        return 'LR'
 
-def generate_test_val(dataframe, split, fnames, type='excel'):
+
+def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
     '''
     Creates seperate files for train and val sets.
 
@@ -583,6 +594,7 @@ def generate_test_val(dataframe, split, fnames, type='excel'):
     split : float 0 < s < 1 - proportion to be assigned to train
     fnames : list<string> - name for each train and val file, inluding extension
     type : string - type of save format (excel, csv, pickle)
+    oversample: Bool - whether to oversample for class imbalance
     '''
     assert isinstance(dataframe, pd.DataFrame), 'Not a dataframe!'
     assert type in ['excel', 'csv', 'pickle'], 'invalid save format!'
@@ -593,10 +605,21 @@ def generate_test_val(dataframe, split, fnames, type='excel'):
     idx = np.arange(0, len(dataframe), 1)
     np.random.shuffle(idx)
     tr = idx[:int(len(idx) * split)]
+
     val = idx[int(len(idx) * split):]
 
     train = dataframe.iloc[tr, :]
     validation = dataframe.iloc[val, :]
+
+    if oversample==True:
+        #determine quadrant
+        y=train.apply(get_quad,axis=1)
+        #intialise oversampler
+        ros = RandomOverSampler()
+        #update training data with oversampling
+        train, Y_bal = ros.fit_resample(train,y)
+
+
     if type == 'excel':
         train.to_excel(fnames[0])
         validation.to_excel(fnames[1])
