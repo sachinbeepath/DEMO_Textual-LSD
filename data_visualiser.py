@@ -1,4 +1,5 @@
 #%%
+from cProfile import label
 from operator import concat
 from re import A
 import pandas as pd
@@ -6,6 +7,7 @@ import numpy as np
 import nltk
 from nltk.corpus import words as ws
 import matplotlib.pyplot as plt
+import matplotlib.colors
 from collections import Counter
 #Spacy?
 
@@ -14,8 +16,55 @@ from collections import Counter
 datafile = pd.read_pickle("Data_8500_cleaned.pkl")
 df = pd.DataFrame(datafile)
 
+#%%
+
+scaled_df = pd.DataFrame()
+for tag in ['valence_tags','arousal_tags','dominance_tags']:
+    scaled_df[tag] = (df[tag]-5)/5
+    min_ = (np.min(df[tag]) - 5)/5
+    max_ = (np.max(df[tag]) - 5)/5
+
+
+    print(f'min of {tag} is {min_}, max is {max_}')
+#%%
+
+median_scaled_df = pd.DataFrame()
+for tag in ['valence_tags','arousal_tags','dominance_tags']:
+    min_ = np.min(df[tag])
+    max_ = np.max(df[tag])
+    range_ = max_-min_
+    median_scaled_df[tag] = (df[tag]-np.median(df[tag]))/(0.5*range_)
+
+
+
+    print(f'min of {tag} is {min_}, max is {max_}')
+
+
+#%%
+cm = plt.cm.get_cmap('RdYlBu')
+
+scat_plt = plt.scatter(scaled_df['valence_tags'],scaled_df['arousal_tags'],c = scaled_df['dominance_tags'],vmin=-1, vmax=+1,cmap=cm)
+
+cbar = plt.colorbar(scat_plt,)
+cbar.set_label('dominance')
+plt.xlabel('valence')
+plt.ylabel('arousal')
+plt.show()
+
+
 #create functions to get key metrics
 #%%
+def get_quad(valence,arousal):
+    if arousal>0 and valence>0:
+        return 'UR'
+    elif arousal>0 and valence<=0:
+        return 'UL'
+    elif arousal<=0 and valence<=0:
+        return 'LL'
+    elif arousal<=0 and valence>0:
+        return 'LR'
+
+
 def drop_pads(df):
     indicies = (df != '<PAD>')
     return df[indicies]
@@ -33,6 +82,30 @@ complexity = removed_pads.apply(get_complexity)
 
 print(f'mean song length is {np.mean(song_lengths)}')
 print(f'song length std is {np.std(song_lengths)}')
+
+#Get quadrants
+#%%
+median_scaled_df['quadrant'] = median_scaled_df.apply(lambda row: get_quad(row['valence_tags'],row['arousal_tags']),axis =1)
+med_distribution = median_scaled_df.groupby('quadrant').count()
+#all tag counts are the same
+med_distribution['quadrant'] = med_distribution['arousal_tags']
+med_distribution['percentage']= med_distribution['quadrant']/np.sum(med_distribution['quadrant'])
+print(med_distribution[['quadrant','percentage']])
+#%%
+print(med_distribution[['quadrant','percentage']])
+
+#%%
+scaled_df['quadrant'] = scaled_df.apply(lambda row: get_quad(row['valence_tags'],row['arousal_tags']),axis =1)
+print(scaled_df.head())
+
+distribution = scaled_df.groupby('quadrant').count()
+distribution['percentage']= distribution['quadrants']/np.sum(distribution['quadrants'])
+
+print(distribution[['quadrant','percentage']])
+
+
+#%%
+print(10%10)
 
 #plot and save histograms
 # %%
