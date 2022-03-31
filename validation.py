@@ -4,7 +4,7 @@ import utils
 ##### Key Variables #####
 BATCH_SIZE = 32
 USE_DOM = True
-FILENAME = '8500_songs_validation.xlsx' 
+FILENAME = 'validation_balanced.xlsx' 
 ATTENTION_HEADS = 8
 EMBEDDING_SIZE = 64
 NUM_ENCODER_LAYERS = 1
