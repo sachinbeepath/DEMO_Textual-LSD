@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import multitaskNet as mtn
 import matplotlib.pyplot as plt
-from imblearn.over_sampling import RandomOverSampler
+#from imblearn.over_sampling import RandomOverSampler
 import os
 from sklearn.metrics import confusion_matrix
 
