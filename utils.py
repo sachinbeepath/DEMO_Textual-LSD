@@ -357,7 +357,7 @@ class Textual_LSD_TVT():
                 
                 valence_loss = self.valence_L(output[0], val)
                 arousal_loss = self.arousal_L(output[1], aro)
-                dominance_loss = self.dominance_L(output[2], dom) if self.use_dom == True else torch.tensor([0])
+                dominance_loss = self.dominance_L(output[2], dom) if self.use_dom == True else torch.tensor([0]).to(self.device)
                 quad_loss = self.quad_L(quad_pred, quad)
                 loss = arousal_loss + valence_loss + dominance_loss + quad_loss
                 loss.backward()
@@ -456,7 +456,7 @@ class Textual_LSD_TVT():
         '''
         self.test_losses = []
         # Testing Loop
-        self.multitask.eval(True)
+        self.multitask.eval()
         total = 0
         correct_raw = 0
         correct_am = 0

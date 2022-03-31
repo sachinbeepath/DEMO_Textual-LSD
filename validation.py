@@ -24,7 +24,8 @@ trainer.load_vocab('vocab_emb64.pkl')
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
                         None, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15, train=False)
 trainer.load_models('Previous_40epoch_settings_25drp.pt', None, train=False)
-trainer.test()
+trainer.test(enc_version=0)
+
 
 
 

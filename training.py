@@ -7,7 +7,7 @@ import torch.nn.functional as F
 EPOCHS = 2 #Until convergence
 BATCH_SIZE = 32 # 8
 LR = 5e-5 #2e-5
-USE_DOM = True
+USE_DOM = False
 FILENAME = '8500_songs_training.xlsx'
 ATTENTION_HEADS = 8 # 8
 EMBEDDING_SIZE = 64 # 512
@@ -31,8 +31,10 @@ trainer.load_vocab('vocab_emb64.pkl')
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
                         LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=25)
 trainer.load_models('Previous_40epoch_settings_25drp.pt', None, train=False)
-trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'Previous_40epoch_settings_25drp.pt', enc_version=0)
+trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'nodomtest.pt', enc_version=1)
 trainer.plot_data(averaging_window=1)
+
+
 
 
 
