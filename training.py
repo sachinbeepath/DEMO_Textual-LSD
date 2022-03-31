@@ -27,8 +27,8 @@ print(w2v.shape)
 
 trainer = utils.Textual_LSD_TVT(verbose=True)
 trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
-#trainer.load_vocab('vocab_emb64.pkl')
-trainer.generate_vocab(True, 'Balanced_Vocab.pkl')
+trainer.load_vocab('Balanced_Vocab.pkl')
+# trainer.generate_vocab(True, 'Balanced_Vocab.pkl')
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM,
                         LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15)
 trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'balancedTest.pt', enc_version=1)
