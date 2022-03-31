@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import multitaskNet as mtn
 import matplotlib.pyplot as plt
+from imblearn.over_sampling import RandomOverSampler
 import os
 from sklearn.metrics import confusion_matrix
 
@@ -139,6 +140,7 @@ class Textual_LSD_TVT():
         self.vocab_len = None
 
         # Model generating
+        self.model_name = None
         self.multitask = None
         self.optim = None
         self.scheduler = None
@@ -249,6 +251,7 @@ class Textual_LSD_TVT():
         w2v : torch.Tensor - Tensor containing Word2Vec embedding weights. This will replace the nn.Embedding weights if not set to None
         train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
         '''
+        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}'
         if self.verbose:
             print('Starting Generate Models...')
         assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
@@ -338,6 +341,8 @@ class Textual_LSD_TVT():
         for epoch in range(epochs):
             total = 0
             correct = 0
+            TOTAL = 0
+            CORRECT = 0
             print(f'Epoch {epoch + 1} / {epochs}')
             t_0 = time.time()
             t = time.time()
@@ -353,7 +358,7 @@ class Textual_LSD_TVT():
                 
                 valence_loss = self.valence_L(output[0], val)
                 arousal_loss = self.arousal_L(output[1], aro)
-                dominance_loss = self.dominance_L(output[2], dom) if self.use_dom == True else torch.tensor([0])
+                dominance_loss = self.dominance_L(output[2], dom) if self.use_dom == True else torch.tensor([0]).to(self.device)
                 quad_loss = self.quad_L(quad_pred, quad)
                 loss = arousal_loss + valence_loss + dominance_loss + quad_loss
                 loss.backward()
@@ -361,13 +366,14 @@ class Textual_LSD_TVT():
                 self.optim.step()
                 epoch_l.append(loss.item())
                 # Calcuate Accuracy
-                total += len(batch)
-                for i in range(len(batch)):
+                total += inp_data.shape[0]
+                TOTAL += inp_data.shape[0]
+                for i in range(inp_data.shape[0]):
                     correct += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
+                    CORRECT += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
 
                 if (batch_idx + 1) % print_step == 0:
                     if self.verbose:
-                        print('')
                         print(f'Batch {batch_idx + 1} / {len(self.dataloader)}')
                     if show_preds:
                         print('VAL pred/true', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
@@ -378,7 +384,7 @@ class Textual_LSD_TVT():
                         print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
                     if show_acc:
                         print(f'Batch Accuracy: {100 * correct / total:.2f}%')
-
+                    print('')
                 if (batch_idx + 1) % save_step == 0:
                     self.losses.append(np.average(epoch_l[-save_step:]))
                     if batch_idx != len(self.dataloader) and (epoch + 1) % 8 == 0 : #ignore final batch since differnt size
@@ -389,6 +395,9 @@ class Textual_LSD_TVT():
                     self.scheduler.step(self.losses[-1])
             if show_time:
                 print(f'Epoch Time: {time.time() - t:.1f}s')
+                print('')
+            if show_acc:
+                print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
         
         # Trainig Loop Complete
         if save_name != None:
@@ -414,8 +423,8 @@ class Textual_LSD_TVT():
         quads = []
         d = {'0,0':2, '0,1':1, '1,1':0, '1,0':3}
         for v, a in zip(V, A):
-            a = f'{int(v)},{int(a)}'
-            quads.append(d[a])
+            b = f'{int(v)},{int(a)}'
+            quads.append(d[b])
         return torch.tensor(quads)
 
     def p_r_f(self, C):
@@ -429,6 +438,7 @@ class Textual_LSD_TVT():
             TP = np.diag(C)
             FP = np.sum(C, axis=0) - TP
             FN = np.sum(C, axis=1) - TP
+            print(TP, FP, FN)
 
         precision = TP/(TP+FP)
         recall = TP/(TP+FN)
@@ -448,6 +458,7 @@ class Textual_LSD_TVT():
         total = 0
         correct_raw = 0
         correct_am = 0
+        correct = 0
 
         #confusion matrix
         self.Cmat_raw = np.zeros((4,4))
@@ -464,7 +475,9 @@ class Textual_LSD_TVT():
             aro = batch['arousal_tags'].long().to(self.device)
             dom = batch['dominance_tags'].long().to(self.device)
             quad = self.VA_to_quadrant(val, aro).to(self.device)
+
             output, quad_pred_raw = self.multitask(inp_data, version=enc_version)
+
             val_pred = torch.argmax(output[0], dim=1)
             aro_pred = torch.argmax(output[1], dim=1)
             quad_pred_am = self.ArgMax_to_quadrant(val_pred, aro_pred).numpy()
@@ -473,16 +486,19 @@ class Textual_LSD_TVT():
 
             self.__printc('Testing:')
             print(f'{100 * batch_idx / len(self.dataloader):.1f}% Complete')
+            total += inp_data.shape[0]
+            for i in range(inp_data.shape[0]):
+                correct += 1 if quad_pred_raw[i] == quad[i] else 0
 
             correct_raw += sum(quad_pred_raw == quad)
-            self.Cmat_raw += confusion_matrix(quad_pred_raw,quad,labels=labels)
+            self.Cmat_raw += confusion_matrix(quad, quad_pred_raw,labels=labels)
             
             correct_am += sum(quad_pred_am == quad)
-            self.Cmat_am += confusion_matrix(quad_pred_am,quad,labels=labels)
-            total += inp_data.shape[0]
+            self.Cmat_am += confusion_matrix(quad, quad_pred_am,labels=labels)
+            #total += len(batch)
             
-            self.Cmat_val += confusion_matrix(val_pred.cpu(),val.cpu(),labels=[0,1])
-            self.Cmat_aro += confusion_matrix(aro_pred.cpu(),aro.cpu(),labels=[0,1])
+            self.Cmat_val += confusion_matrix(val.cpu(), val_pred.cpu(),labels=[0,1])
+            self.Cmat_aro += confusion_matrix(aro.cpu(), aro_pred.cpu(),labels=[0,1])
 
         p_raw, r_raw, f_raw = self.p_r_f(self.Cmat_raw)
         p_am, r_am, f_am = self.p_r_f(self.Cmat_am)
@@ -493,6 +509,7 @@ class Textual_LSD_TVT():
         self.acc_am = 100 * correct_am / total
 
         if prnt_acc:
+            print(f'Accuracy: {100 * correct / total:.2f}%')
             print(f'Accuracy of base quadrant predictions: {100 * correct_raw / total:.4f}%')
             print(f'Accuracy of VA quadrant predictions: {100 * correct_am / total:.4f}%')
         if prnt_cm:
@@ -553,8 +570,21 @@ class Textual_LSD_TVT():
         plt.show()
         return
 
+def get_quad(df,A_thresh=5,V_thresh=5):
+    """Returns quadrant given VAD scores"""
+    valence = df['valence_tags']
+    arousal = df['arousal_tags']
+    if arousal>A_thresh and valence>V_thresh:
+        return 'UR'
+    elif arousal>A_thresh and valence<=V_thresh:
+        return 'UL'
+    elif arousal<=A_thresh and valence<=V_thresh:
+        return 'LL'
+    elif arousal<=A_thresh and valence>V_thresh:
+        return 'LR'
 
-def generate_test_val(dataframe, split, fnames, type='excel'):
+
+def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
     '''
     Creates seperate files for train and val sets.
 
@@ -564,6 +594,7 @@ def generate_test_val(dataframe, split, fnames, type='excel'):
     split : float 0 < s < 1 - proportion to be assigned to train
     fnames : list<string> - name for each train and val file, inluding extension
     type : string - type of save format (excel, csv, pickle)
+    oversample: Bool - whether to oversample for class imbalance
     '''
     assert isinstance(dataframe, pd.DataFrame), 'Not a dataframe!'
     assert type in ['excel', 'csv', 'pickle'], 'invalid save format!'
@@ -574,10 +605,21 @@ def generate_test_val(dataframe, split, fnames, type='excel'):
     idx = np.arange(0, len(dataframe), 1)
     np.random.shuffle(idx)
     tr = idx[:int(len(idx) * split)]
+
     val = idx[int(len(idx) * split):]
 
     train = dataframe.iloc[tr, :]
     validation = dataframe.iloc[val, :]
+
+    if oversample==True:
+        #determine quadrant
+        y=train.apply(get_quad,axis=1)
+        #intialise oversampler
+        ros = RandomOverSampler()
+        #update training data with oversampling
+        train, Y_bal = ros.fit_resample(train,y)
+
+
     if type == 'excel':
         train.to_excel(fnames[0])
         validation.to_excel(fnames[1])

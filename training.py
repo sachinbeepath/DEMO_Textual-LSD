@@ -7,10 +7,10 @@ import torch.nn.functional as F
 EPOCHS = 2 #Until convergence
 BATCH_SIZE = 32 # 8
 LR = 5e-5 #2e-5
-USE_DOM = False
-FILENAME = '8500_songs_training.xlsx'
+USE_DOM = True
+FILENAME = 'train_balanced.xlsx'
 ATTENTION_HEADS = 8 # 8
-EMBEDDING_SIZE = 64 # 512
+EMBEDDING_SIZE = 32 # 512
 NUM_ENCODER_LAYERS = 1 # 3
 FORWARD_XP = 64
 DROPOUT = 0.25 # 0.1
@@ -27,9 +27,13 @@ print(w2v.shape)
 
 trainer = utils.Textual_LSD_TVT(verbose=True)
 trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
-trainer.load_vocab('vocab_emb64.pkl')
+#trainer.load_vocab('vocab_emb64.pkl')
+trainer.generate_vocab(True, 'Balanced_Vocab.pkl')
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM,
-                        LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=25)
-trainer.load_models('Previous_40epoch_settings_25drp.pt', None, train=False)
-trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'nodomtest.pt', enc_version=1)
+                        LR, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15)
+trainer.train(EPOCHS, PRINT_STEP, SAVE_STEP, 'balancedTest.pt', enc_version=1)
 trainer.plot_data(averaging_window=1)
+
+
+
+
