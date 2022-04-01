@@ -399,8 +399,17 @@ class Textual_LSD_TVT():
                 print('')
             if show_acc:
                 print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
-        
-        # Trainig Loop Complete
+            if save:
+                if save_name is not None:
+                    epoch_name = save_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                else:
+                    epoch_name = self.model_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                
+                torch.save(self.multitask.state_dict(), epoch_name)
+                if self.verbose:
+                    print(f'Successfully saved model weights for epoch {epoch +1}.')
+       
+        # Training Loop Complete
         if save:
             torch.save(self.multitask.state_dict(), save_name if save_name is not None else self.model_name)
             if self.verbose:
@@ -635,4 +644,6 @@ def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
         validation.to_pickle(fnames[1])
     print('Files Saved')
     return
+
+
 
