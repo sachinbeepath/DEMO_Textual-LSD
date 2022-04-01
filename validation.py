@@ -4,7 +4,7 @@ import utils
 ##### Key Variables #####
 BATCH_SIZE = 32
 USE_DOM = True
-FILENAME = 'validation_balanced.xlsx' 
+FILENAME = 'Datasets/validation_balanced.xlsx' 
 ATTENTION_HEADS = 8
 EMBEDDING_SIZE = 64
 NUM_ENCODER_LAYERS = 1
@@ -20,10 +20,10 @@ SAVE_STEP = 5
 
 trainer = utils.Textual_LSD_TVT(verbose=True)
 trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
-trainer.load_vocab('Balanced_Vocab.pkl')
+trainer.load_vocab('Pickles/Balanced_Vocab.pkl')
 trainer.generate_models(EMBEDDING_SIZE, ATTENTION_HEADS, DROPOUT, USE_DOM, 
                         None, MT_HEADS, NUM_ENCODER_LAYERS, FORWARD_XP, DEVICE, lr_pat=15, train=False)
-trainer.load_models('Previous_40epoch_settings_25drp.pt', None, train=False)
+trainer.load_models('Weights/Previous_40epoch_settings_25drp.pt', None, train=False)
 trainer.test(enc_version=0)
 
 
