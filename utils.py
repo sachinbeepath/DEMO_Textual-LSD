@@ -133,6 +133,7 @@ class Textual_LSD_TVT():
         self.stemmer = None
         self.tokenizer = None
         self.max_length = None
+        self.validation_dataloader = None
 
         # vocabulary loading
         self.vocab = None
@@ -174,7 +175,20 @@ class Textual_LSD_TVT():
     def load_dataset(self, fname, max_length, batch_size, lyric_col='lyrics', 
                         label_cols = ['valence_tags', 'arousal_tags', 'dominance_tags'], 
                         remove_between_brackets=True, stem=True, stemmer=PorterStemmer(), 
-                        tokenize=True, tokenizer=word_tokenize):
+                        tokenize=True, tokenizer=word_tokenize, validation=False):
+        '''
+        fname : string - filename of excel file to load in
+        max_length : int - length to pad/crop sentences to
+        batch_size : int - dataloader batch size
+        lyric_col : str - name of column with lyrics
+        label_cols : [str] - names of columns containing labels
+        remove_between_brackets : bool - whether to remove words between brackets
+        stem : bool - whether to stem
+        stemmer : stemmer - stemmer object
+        tokenize : bool - whether to tokenize
+        tokenizer : tokenzier - callable tokenizer
+        validation : bool - whether the dataset is for validation or not
+        '''
         if self.verbose:
             print('Starting Load Dataset...')
         file = pd.read_excel(fname)
@@ -185,17 +199,25 @@ class Textual_LSD_TVT():
         dataset.scale_VAD_scores(5, 5)
         dataset.clean_lyrics(remove_between_brackets=remove_between_brackets, stem=stem, stemmer=self.stemmer, 
                                 tokenize=tokenize, tokenizer=tokenizer, length=max_length)
-        dataloader_tr = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-        self.dataset = dataset
-        self.dataloader = dataloader_tr
-        self.dataframe = df
-        self.max_length = max_length
+        if validation == False:
+            self.dataset = dataset
+            self.dataloader = dataloader
+            self.dataframe = df
+            self.max_length = max_length
+        else:
+            self.validation_dataloader = dataloader
+
         if self.verbose:
             print("Succesfully Loaded Dataframe")
         return
 
     def generate_vocab(self, save=False, save_name=None):
+        '''
+        save : bool - whether to save the vocab to a pickle
+        save_name : str - file name to save vocab to
+        '''
         if self.verbose:
             print('Starting Generate Vocab...')
         assert self.dataset is not None, 'Please load in a dataset before generating a vocabulary'
@@ -216,6 +238,9 @@ class Textual_LSD_TVT():
         return 
     
     def load_vocab(self, fname):
+        '''
+        fname : str - file name of vocab pkl file to load
+        '''
         if self.verbose:
             print('Starting Load Vocab...')
         assert self.dataset is not None, 'Please load in a dataset before loading a vocabulary'
@@ -251,7 +276,7 @@ class Textual_LSD_TVT():
         w2v : torch.Tensor - Tensor containing Word2Vec embedding weights. This will replace the nn.Embedding weights if not set to None
         train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
         '''
-        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}len{self.max_length}drp{str(drp).replace(".","")}.pt'
+        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}len{self.max_length}drp{str(drp).replace(".","")}dom{1*dom}.pt'
         print(self.model_name)
         if self.verbose:
             print('Starting Generate Models...')
@@ -259,7 +284,7 @@ class Textual_LSD_TVT():
         assert self.pad_idx is not None, 'Please generate or load a vocabulary before training'
 
         self.multitask = mtn.multitaskNet(mt_heads, self.max_length+2, emb_size, drp, dev, 
-                                self.vocab_len, num_enc, att_heads, forw_exp, 
+                                self.vocab_lwen, num_enc, att_heads, forw_exp, 
                                 self.pad_idx, dom, w2v).to(dev)
         self.multitask.double()
 
@@ -302,6 +327,10 @@ class Textual_LSD_TVT():
         return
 
     def VA_to_quadrant(self, V, A):
+        '''
+        V : float - Valence value
+        A : float - Arousal value
+        '''
         quads = []
         for v, a in zip(V, A):
             if v > 0:
@@ -316,8 +345,9 @@ class Textual_LSD_TVT():
                     quads.append(2)
         return torch.tensor(quads)
 
-    def train(self, epochs, print_step, save_step, save=True, save_name=None, 
-                show_preds=False, show_acc=True, show_loss=True, show_time=True, enc_version=1):
+    def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None, 
+                show_preds=False, show_acc=True, show_loss=True, show_time=True, 
+                enc_version=1, validation_freq=None, val_acc=True, val_cm=True, val_prf=False):
         '''
         Trains the network
 
@@ -327,11 +357,16 @@ class Textual_LSD_TVT():
         print_step : int - print data every N batches (averaged since previous print)
         save_step : int - save data every N batches (averaged since previous save)
         save_name : string - filename to save model under (including .pt)
+        save_epochs : int - every Nth epoch the model weights will be saved.
         show_preds : bool - whether to print predictions on print_step
         show_acc : bool - whether to print accuracy on print_step
         show_loss : bool - whether to print loss on print_step
         show_time : bool - whether to print the time taken per epoch
         enc_version : binary - 0=Pytorch implementation of transformer, 1=Manually coded transformer
+        validation_freq : int - every Nth epoch the model will run a validation test. Ensure validation data is loaded
+        val_acc : bool - whether to print accuracy after validation run
+        val_cm : bool - whether to print confusion matrices after validation run
+        val_prf : bool - whether to print precision/recall/F-score after validation run
         '''
         if self.verbose:
             print(f'Number of batches per epoch: {len(self.dataloader)}')
@@ -399,8 +434,25 @@ class Textual_LSD_TVT():
                 print('')
             if show_acc:
                 print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
+
+            if (epoch + 1) % validation_freq == 0:
+                self.optim.zero_grad()
+                self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False)
+                self.optim.zero_grad()
         
         # Trainig Loop Complete
+            if save_epochs is not None:
+                if (epoch + 1) % save_epochs == 0:
+                    if save_name is not None:
+                        epoch_name = save_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                    else:
+                        epoch_name = self.model_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                
+                    torch.save(self.multitask.state_dict(), epoch_name)
+                    if self.verbose:
+                        print(f'Successfully saved model weights for epoch {epoch +1}.')
+       
+        # Training Loop Complete
         if save:
             torch.save(self.multitask.state_dict(), save_name if save_name is not None else self.model_name)
             if self.verbose:
@@ -450,7 +502,7 @@ class Textual_LSD_TVT():
         
         return precision, recall, f_score
 
-    def test(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True):
+    def test(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True, show_progress=True):
         '''
         Performs and evaluation run on the dataset, recording accuracy, confusion matrices and Precision/Recall/F-score.
         enc_version : 0 or 1 - 0 -> pytorch implementation of transformer, 1 -> manually-coded transformer
@@ -473,7 +525,11 @@ class Textual_LSD_TVT():
 
         labels = [0,1,2,3]
 
-        for batch_idx, batch in enumerate(self.dataloader):
+        for batch_idx, batch in enumerate(self.validation_dataloader):
+            if show_progress:
+                self.__printc('Testing:')
+                print(f'{100 * batch_idx / len(self.dataloader):.1f}% Complete')
+            
             inp_data = batch['lyrics'].to(self.device)
             val = batch['valence_tags'].long().to(self.device)
             aro = batch['arousal_tags'].long().to(self.device)
@@ -488,8 +544,6 @@ class Textual_LSD_TVT():
             quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
             quad = quad.detach().cpu().numpy()
 
-            self.__printc('Testing:')
-            print(f'{100 * batch_idx / len(self.dataloader):.1f}% Complete')
             total += inp_data.shape[0]
             for i in range(inp_data.shape[0]):
                 correct += 1 if quad_pred_raw[i] == quad[i] else 0
@@ -526,7 +580,7 @@ class Textual_LSD_TVT():
             print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
             print('Precision, recall, and f-score valence predictions: {},{},{}'.format(round(p_val,3),round(r_val,3),round(f_val,3)))
             print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
-        
+        self.multitask.train()
         return
 
                 
@@ -567,9 +621,9 @@ class Textual_LSD_TVT():
         '''
         w = np.ones(averaging_window) / averaging_window
         fig, axs = plt.subplots(2)
-        axs[0].plot(np.convolve(self.losses[averaging_window:-averaging_window], w))
+        axs[0].plot(np.convolve(self.losses, w)[averaging_window:-averaging_window])
         axs[0].set_title('Training Losses')
-        axs[1].plot(np.convolve(self.accuracy[averaging_window:-averaging_window], w))
+        axs[1].plot(np.convolve(self.accuracy, w)[averaging_window:-averaging_window])
         axs[1].set_title('Quadrant Prediction Accuracy')
         plt.show()
         return
@@ -635,4 +689,6 @@ def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
         validation.to_pickle(fnames[1])
     print('Files Saved')
     return
+
+
 
