@@ -284,7 +284,7 @@ class Textual_LSD_TVT():
         assert self.pad_idx is not None, 'Please generate or load a vocabulary before training'
 
         self.multitask = mtn.multitaskNet(mt_heads, self.max_length+2, emb_size, drp, dev, 
-                                self.vocab_lwen, num_enc, att_heads, forw_exp, 
+                                self.vocab_len, num_enc, att_heads, forw_exp, 
                                 self.pad_idx, dom, w2v).to(dev)
         self.multitask.double()
 
