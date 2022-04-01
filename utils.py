@@ -345,7 +345,7 @@ class Textual_LSD_TVT():
                     quads.append(2)
         return torch.tensor(quads)
 
-    def train(self, epochs, print_step, save_step, save=True, save_name=None, 
+    def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, 
                 enc_version=1, validation_freq=None, val_acc=True, val_cm=True, val_prf=False):
         '''
@@ -357,6 +357,7 @@ class Textual_LSD_TVT():
         print_step : int - print data every N batches (averaged since previous print)
         save_step : int - save data every N batches (averaged since previous save)
         save_name : string - filename to save model under (including .pt)
+        save_epochs : int - every Nth epoch the model weights will be saved.
         show_preds : bool - whether to print predictions on print_step
         show_acc : bool - whether to print accuracy on print_step
         show_loss : bool - whether to print loss on print_step
@@ -434,12 +435,24 @@ class Textual_LSD_TVT():
             if show_acc:
                 print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
 
-            if (epoch % validation_freq) == 0:
+            if (epoch + 1) % validation_freq == 0:
                 self.optim.zero_grad()
                 self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False)
                 self.optim.zero_grad()
         
         # Trainig Loop Complete
+            if save_epochs is not None:
+                if (epoch + 1) % save_epochs == 0:
+                    if save_name is not None:
+                        epoch_name = save_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                    else:
+                        epoch_name = self.model_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                
+                    torch.save(self.multitask.state_dict(), epoch_name)
+                    if self.verbose:
+                        print(f'Successfully saved model weights for epoch {epoch +1}.')
+       
+        # Training Loop Complete
         if save:
             torch.save(self.multitask.state_dict(), save_name if save_name is not None else self.model_name)
             if self.verbose:
@@ -676,4 +689,6 @@ def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
         validation.to_pickle(fnames[1])
     print('Files Saved')
     return
+
+
 

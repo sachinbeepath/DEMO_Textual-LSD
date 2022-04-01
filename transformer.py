@@ -45,7 +45,7 @@ class MultiHeadAttention(nn.Module):
         # v = self.Wv(values) #(b,n,heads,heads_dim)
         # k = self.Wk(keys) #(b,n,heads,heads_dim)
         W = torch.einsum("nqhd,nkhd->nhqk",[q,k])
-        attention = F.softmax(W/(d**(1/2)),dim=3)
+        attention = F.softmax(W/(self.heads_dim**(1/2)),dim=3)
         Y = torch.einsum("nhqk,nkhd->nqhd",[attention,v]).reshape(b,n,self.emb) #(b,n,d)
         
         return self.out(Y)
