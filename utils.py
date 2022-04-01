@@ -223,8 +223,8 @@ class Textual_LSD_TVT():
         '''
         if self.verbose:
             print('Starting Generate Vocab...')
-        assert self.dataset is not None, 'Please load in a dataset before generating a vocabulary'
-        assert self.dataframe is not None, 'Please load in a dataframe before generating a vocabulary'
+        assert self.dataset is not None, 'Please load in a training dataset before generating a vocabulary'
+        assert self.dataframe is not None, 'Please load in a training dataframe before generating a vocabulary'
 
         self.vocab = Vocabulary(start_token='<SOS>', end_token='<EOS>', pad_token='<PAD>')
         self.vocab.creat_vocabulary(np.array(self.dataframe['lyrics']), max_size=30000, min_freq=5)
