@@ -134,6 +134,7 @@ class Textual_LSD_TVT():
         self.tokenizer = None
         self.max_length = None
         self.validation_dataloader = None
+        self.validation_dataset = None
 
         # vocabulary loading
         self.vocab = None
@@ -207,7 +208,9 @@ class Textual_LSD_TVT():
             self.dataframe = df
             self.max_length = max_length
         else:
+            self.validation_dataset = dataset
             self.validation_dataloader = dataloader
+            
 
         if self.verbose:
             print("Succesfully Loaded Dataframe")
@@ -243,11 +246,15 @@ class Textual_LSD_TVT():
         '''
         if self.verbose:
             print('Starting Load Vocab...')
-        assert self.dataset is not None, 'Please load in a dataset before loading a vocabulary'
+        #assert self.dataset is not None, 'Please load in a dataset before loading a vocabulary'
 
         self.vocab = Vocabulary()
         self.vocab.load(fname)
-        self.dataset.set_vocab(self.vocab)
+        if self.dataset is not None:
+            self.dataset.set_vocab(self.vocab)
+        if self.validation_dataset is not None:
+            self.validation_dataset.set_vocab(self.vocab)
+            
         self.vocab_len = len(self.vocab)
         self.pad_idx = self.vocab.pad_idx
         if self.verbose:
