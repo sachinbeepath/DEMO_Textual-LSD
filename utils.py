@@ -251,7 +251,8 @@ class Textual_LSD_TVT():
         w2v : torch.Tensor - Tensor containing Word2Vec embedding weights. This will replace the nn.Embedding weights if not set to None
         train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
         '''
-        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}'
+        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}len{self.max_length}drp{str(drp).replace(".","")}.pt'
+        print(self.model_name)
         if self.verbose:
             print('Starting Generate Models...')
         assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
@@ -315,7 +316,7 @@ class Textual_LSD_TVT():
                     quads.append(2)
         return torch.tensor(quads)
 
-    def train(self, epochs, print_step, save_step, save_name=None, 
+    def train(self, epochs, print_step, save_step, save=True, save_name=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, enc_version=1):
         '''
         Trains the network
@@ -400,19 +401,22 @@ class Textual_LSD_TVT():
                 print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
         
         # Trainig Loop Complete
-        if save_name != None:
-            torch.save(self.multitask.state_dict(), save_name)
+        if save:
+            torch.save(self.multitask.state_dict(), save_name if save_name is not None else self.model_name)
             if self.verbose:
-                print(f'Successfully saved model weights as {save_name}')
+                print(f'Successfully saved model weights.')
         else:
-            print('You have not entered a save name for the model')
-            name = input('If you wish to save it, please type a file name now (.pt), otherwise enter N: ')
+            print('You have set SAVE to False. Are you sure?')
+            name = input('If you wish to save it, please type a file name now (.pt), or enter Y to use a default file name, otherwise enter N: ')
             if name not in ['n', 'N', ' n', ' N', 'no', 'No']:
-                torch.save(self.multitask.state_dict(), name)
+                if name not in ['Y', 'y']:
+                    torch.save(self.multitask.state_dict(), name)
+                else:
+                    torch.save(self.multitask.state_dict(), self.model_name)
                 if self.verbose:
                     print(f'Successfully saved model weights as {name}')
             else:
-                print(f'Training Compeleted. Total time: {time.time() - t_0:.0f}s')
+                print(f'Training Compeleted. Model Not Saved. Total time: {time.time() - t_0:.0f}s')
         return
 
     def ArgMax_to_quadrant(self, V, A):
