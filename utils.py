@@ -252,9 +252,10 @@ class Textual_LSD_TVT():
         self.vocab.load(fname)
         if self.dataset is not None:
             self.dataset.set_vocab(self.vocab)
+            print('training vocab loaded')
         if self.validation_dataset is not None:
             self.validation_dataset.set_vocab(self.vocab)
-            
+            print('validation vocab loaded')
         self.vocab_len = len(self.vocab)
         self.pad_idx = self.vocab.pad_idx
         if self.verbose:
@@ -442,7 +443,7 @@ class Textual_LSD_TVT():
             if show_acc:
                 print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
 
-            if (epoch + 1) % validation_freq == 0:
+            if epoch % validation_freq == 0:
                 self.optim.zero_grad()
                 self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False)
                 self.optim.zero_grad()
