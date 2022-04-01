@@ -18,6 +18,7 @@ import nltk
 import gensim.models.word2vec as w2v
 import multiprocessing
 import pickle
+from sklearn import preprocessing
 
 clear = lambda: os.system('cls')
 
@@ -35,20 +36,6 @@ This is the main training script.
 Contains the primary training loop for the Textual-LSD research network.
 '''
 
-def VA_to_quadrant(V, A):
-    quads = []
-    for v, a in zip(V, A):
-        if v > 0:
-            if a > 0:
-                quads.append(0)
-            else:
-                quads.append(3)
-        else:
-            if a > 0:
-                quads.append(1)
-            else:
-                quads.append(2)
-    return torch.tensor(quads)
 
 ##### Key Variables #####
 # Hashed values are those used in the reference paper
@@ -106,6 +93,9 @@ for i in range(n):
     main_list.append(sub_list)
 lyrics = main_list
 
+### getting target vocab
+target_vocab = {x for l in lyrics for x in l}
+
 # train word2vec
 num_features = 32
 min_word_count = 5
@@ -141,6 +131,10 @@ for i, word in enumerate(english.vocab):
         words_found += 1
     except KeyError:
         weights_matrix[i] = np.random.normal(scale=0.6, size=(1,EMBEDDING_SIZE))
+
+norm_weights = torch.Tensor(preprocessing.normalize(weights_matrix))
+torch.save(norm_weights, 'w2v_norm_weights.pkl',pickle_module= pickle)
+
 
 w2v_weights_matrix = weights_matrix.clone().detach().requires_grad_(True)
 torch.save(w2v_weights_matrix, 'w2v_weights.pkl',pickle_module= pickle)
