@@ -159,6 +159,7 @@ class Textual_LSD_TVT():
         self.aropoints = []
         self.true_quads = []
         self.accuracy = []
+        self.val_accuracy = [0]
 
         # Testing
         self.acc_raw = None
@@ -444,8 +445,10 @@ class Textual_LSD_TVT():
 
             if (epoch + 1) % validation_freq == 0:
                 self.optim.zero_grad()
-                self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False)
+                self.val_accuracy.append(self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False, ret_acc=True))
                 self.optim.zero_grad()
+            else:
+                self.val_accuracy.append(self.val_accuracy[-1])
         
         # Trainig Loop Complete
             if save_epochs is not None:
@@ -509,7 +512,7 @@ class Textual_LSD_TVT():
         
         return precision, recall, f_score
 
-    def test(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True, show_progress=True):
+    def test(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True, show_progress=True, ret_acc=False):
         '''
         Performs and evaluation run on the dataset, recording accuracy, confusion matrices and Precision/Recall/F-score.
         enc_version : 0 or 1 - 0 -> pytorch implementation of transformer, 1 -> manually-coded transformer
@@ -588,6 +591,8 @@ class Textual_LSD_TVT():
             print('Precision, recall, and f-score valence predictions: {},{},{}'.format(round(p_val,3),round(r_val,3),round(f_val,3)))
             print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
         self.multitask.train()
+        if ret_acc:
+            return (correct_raw + correct_am) / 2
         return
 
                 
@@ -621,7 +626,7 @@ class Textual_LSD_TVT():
         ind = np.where(np.array([acc, cm, prf]) * 1 == 1)
         return tuple(out[i] for i in ind[0][:])
 
-    def plot_data(self, averaging_window=20):
+    def plot_data(self, averaging_window=20, validation=False):
         '''
         Plots losses and accuracy.
         averaging_window : int - size of moving average frame
@@ -632,6 +637,9 @@ class Textual_LSD_TVT():
         axs[0].set_title('Training Losses')
         axs[1].plot(np.convolve(self.accuracy, w)[averaging_window:-averaging_window])
         axs[1].set_title('Quadrant Prediction Accuracy')
+        if validation:
+            axs[1].plot(self.val_accuracy[averaging_window:-averaging_window])
+            
         plt.show()
         return
 
