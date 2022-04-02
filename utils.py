@@ -356,7 +356,8 @@ class Textual_LSD_TVT():
 
     def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, 
-                enc_version=1, validation_freq=None, val_acc=True, val_cm=True, val_prf=False):
+                enc_version=1, validation_freq=None, val_acc=True, val_cm=True, val_prf=False, 
+                save_folder=None):
         '''
         Trains the network
 
@@ -376,8 +377,11 @@ class Textual_LSD_TVT():
         val_acc : bool - whether to print accuracy after validation run
         val_cm : bool - whether to print confusion matrices after validation run
         val_prf : bool - whether to print precision/recall/F-score after validation run
+        save_folder : string - path to desired save location, e.g. "Weights/"
         '''
         self.model_name = self.model_name + f'eps{epochs}.pt'
+        if save_folder is not None:
+            self.model_name = save_folder + self.model_name
         if self.verbose:
             print(f'Number of batches per epoch: {len(self.dataloader)}')
             print(f'Printing every {print_step} batches, saving every {save_step} batches')
@@ -437,6 +441,7 @@ class Textual_LSD_TVT():
                         self.valpoints.append(torch.squeeze(torch.softmax(output, dim=2)[0, :, 0]).detach().cpu().numpy())
                         self.aropoints.append(torch.squeeze(torch.softmax(output, dim=2)[1, :, 0]).detach().cpu().numpy())
                     self.accuracy.append(correct / total)
+                    self.val_accuracy.append(self.val_accuracy[-1])
                     total, correct = 0, 0
                     self.scheduler.step(self.losses[-1])
             if show_time:
@@ -445,12 +450,11 @@ class Textual_LSD_TVT():
             if show_acc:
                 print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
 
-            if epoch % validation_freq == 0:
+            if (epoch + 1) % validation_freq == 0:
                 self.optim.zero_grad()
                 self.val_accuracy.append(self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False, ret_acc=True))
                 self.optim.zero_grad()
-            else:
-                self.val_accuracy.append(self.val_accuracy[-1])
+                
         
         # Trainig Loop Complete
             if save_epochs is not None:
@@ -594,7 +598,7 @@ class Textual_LSD_TVT():
             print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
         self.multitask.train()
         if ret_acc:
-            return (correct_raw + correct_am) / 2
+            return (correct_raw + correct_am) / (2 * total)
         return
 
                 
