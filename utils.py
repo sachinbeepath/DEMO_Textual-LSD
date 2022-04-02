@@ -285,7 +285,7 @@ class Textual_LSD_TVT():
         w2v : torch.Tensor - Tensor containing Word2Vec embedding weights. This will replace the nn.Embedding weights if not set to None
         train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
         '''
-        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}len{self.max_length}drp{str(drp).replace(".","")}dom{1*dom}.pt'
+        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}len{self.max_length}drp{str(drp).replace(".","")}dom{1*dom}'
         print(self.model_name)
         if self.verbose:
             print('Starting Generate Models...')
@@ -377,6 +377,7 @@ class Textual_LSD_TVT():
         val_cm : bool - whether to print confusion matrices after validation run
         val_prf : bool - whether to print precision/recall/F-score after validation run
         '''
+        self.model_name = self.model_name + f'eps{epochs}.pt'
         if self.verbose:
             print(f'Number of batches per epoch: {len(self.dataloader)}')
             print(f'Printing every {print_step} batches, saving every {save_step} batches')
