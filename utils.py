@@ -357,7 +357,7 @@ class Textual_LSD_TVT():
     def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, 
                 enc_version=1, validation_freq=None, val_acc=True, val_cm=True, val_prf=False, 
-                save_folder=None):
+                save_folder=None, start_epoch=0):
         '''
         Trains the network
 
@@ -378,8 +378,9 @@ class Textual_LSD_TVT():
         val_cm : bool - whether to print confusion matrices after validation run
         val_prf : bool - whether to print precision/recall/F-score after validation run
         save_folder : string - path to desired save location, e.g. "Weights/"
+        start_epoch : int - the starting point for epoch labelling. Used if continuing training
         '''
-        self.model_name = self.model_name + f'eps{epochs}.pt'
+        self.model_name = self.model_name + f'eps{epochs + start_epoch}.pt'
         if save_folder is not None:
             self.model_name = save_folder + self.model_name
         if self.verbose:
@@ -393,7 +394,7 @@ class Textual_LSD_TVT():
             correct = 0
             TOTAL = 0
             CORRECT = 0
-            print(f'Epoch {epoch + 1} / {epochs}')
+            print(f'Epoch {epoch + 1 + start_epoch} / {epochs + start_epoch}')
             t_0 = time.time()
             t = time.time()
             epoch_l = []
@@ -460,9 +461,9 @@ class Textual_LSD_TVT():
             if save_epochs is not None:
                 if (epoch + 1) % save_epochs == 0:
                     if save_name is not None:
-                        epoch_name = save_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                        epoch_name = save_name[:-3]+ "epoch" + str(epoch + 1 + start_epoch) + ".pt"
                     else:
-                        epoch_name = self.model_name[:-3]+ "epoch" + str(epoch + 1) + ".pt"
+                        epoch_name = self.model_name[:-3]+ "epoch" + str(epoch + 1 + start_epoch) + ".pt"
                 
                     torch.save(self.multitask.state_dict(), epoch_name)
                     if self.verbose:
