@@ -211,6 +211,7 @@ class Textual_LSD_TVT():
         else:
             self.validation_dataset = dataset
             self.validation_dataloader = dataloader
+            self.max_length = max_length if self.max_length is None else self.max_length
             
 
         if self.verbose:
@@ -545,7 +546,7 @@ class Textual_LSD_TVT():
         for batch_idx, batch in enumerate(self.validation_dataloader):
             if show_progress:
                 self.__printc('Testing:')
-                print(f'{100 * batch_idx / len(self.dataloader):.1f}% Complete')
+                print(f'{100 * batch_idx / len(self.validation_dataloader):.1f}% Complete')
             
             inp_data = batch['lyrics'].to(self.device)
             val = batch['valence_tags'].long().to(self.device)
