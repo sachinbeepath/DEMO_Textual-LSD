@@ -357,7 +357,7 @@ class Textual_LSD_TVT():
 
     def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, 
-                enc_version=1, validation_freq=None, val_acc=True, val_cm=True, val_prf=False, 
+                enc_version=1, validation_freq=1, val_acc=True, val_cm=True, val_prf=False, 
                 save_folder=None, start_epoch=0):
         '''
         Trains the network
