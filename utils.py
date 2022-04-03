@@ -506,12 +506,12 @@ class Textual_LSD_TVT():
         Calculates precision, recall and f-score from a confusion matrix
         """
         
-        #if C.shape == (2,2):
-         #   TN,FP,FN,TP = C.ravel()
-        #else:
-        TP = np.diag(C)
-        FP = np.sum(C, axis=0) - TP
-        FN = np.sum(C, axis=1) - TP
+        if C.shape == (2,2):
+            TN,FP,FN,TP = C.ravel()
+        else:
+            TP = np.diag(C)
+            FP = np.sum(C, axis=0) - TP
+            FN = np.sum(C, axis=1) - TP
             #print(TP, FP, FN)
 
         precision = TP/(TP+FP)
