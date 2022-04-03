@@ -9,7 +9,6 @@ import pickle
 
 ##### Key Variables #####
 # Hashed values are those used in the reference paper
-EPOCHS = 1 #Until convergence
 BATCH_SIZE = 32 # 8
 FILENAME = 'Datasets/train_balanced.xlsx'
 EMBEDDING_SIZE = 32 # 512
@@ -42,7 +41,7 @@ VOCAB_LEN = len(words)
 # build w2v model
 cores = multiprocessing.cpu_count() # Count the number of cores in a computer
 w2v_model = Word2Vec(min_count=5,
-                     window=2,
+                     window=7,
                      size=EMBEDDING_SIZE,
                      sample=6e-5,
                      alpha=0.03,
