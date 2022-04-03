@@ -53,7 +53,7 @@ class Vocabulary():
 
         bag_of_words = bag_of_words[counts >= min_freq]
         counts = counts[counts >= min_freq]
-
+        print(len(bag_of_words), max_size)
         if len(bag_of_words) > max_size - len(missing_tokens):
             bag_of_words = bag_of_words[:max_size - len(missing_tokens)]
             counts = counts[:max_size - len(missing_tokens)]
@@ -229,7 +229,7 @@ class Textual_LSD_TVT():
         assert self.dataframe is not None, 'Please load in a training dataframe before generating a vocabulary'
 
         self.vocab = Vocabulary(start_token='<SOS>', end_token='<EOS>', pad_token='<PAD>')
-        self.vocab.creat_vocabulary(np.array(self.dataframe['lyrics']), max_size=30000, min_freq=5)
+        self.vocab.creat_vocabulary(np.array(self.dataframe['lyrics']), max_size=1000, min_freq=20)
         self.pad_idx = self.vocab.pad_idx
         self.vocab_len = len(self.vocab)
         self.dataset.set_vocab(self.vocab)
@@ -558,9 +558,13 @@ class Textual_LSD_TVT():
 
             val_pred = torch.argmax(output[0], dim=1)
             aro_pred = torch.argmax(output[1], dim=1)
+    
             quad_pred_am = self.ArgMax_to_quadrant(val_pred, aro_pred).numpy()
             quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
             quad = quad.detach().cpu().numpy()
+            #print(quad_pred_am)
+            #print(quad)
+            print("")
 
             total += inp_data.shape[0]
             for i in range(inp_data.shape[0]):
