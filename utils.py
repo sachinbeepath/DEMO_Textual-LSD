@@ -669,7 +669,7 @@ def get_quad(df,A_thresh=5,V_thresh=5):
         return 'LR'
 
 
-def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
+def generate_test_val(dataframe, split, fnames, type='excel',oversample=False, balance_test=False):
     '''
     Creates seperate files for train and val sets.
 
@@ -680,6 +680,7 @@ def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
     fnames : list<string> - name for each train and val file, inluding extension
     type : string - type of save format (excel, csv, pickle)
     oversample: Bool - whether to oversample for class imbalance
+    balance_test: Bool - whether to balance the test set or not
     '''
     assert isinstance(dataframe, pd.DataFrame), 'Not a dataframe!'
     assert type in ['excel', 'csv', 'pickle'], 'invalid save format!'
@@ -703,6 +704,14 @@ def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
         ros = RandomOverSampler()
         #update training data with oversampling
         train, Y_bal = ros.fit_resample(train,y)
+
+    
+    if balance_test ==True:
+        y_val=validation.apply(get_quad,axis=1)
+        #intialise oversampler
+        ros = RandomOverSampler()
+        #update training data with oversampling
+        validation, Y_bal = ros.fit_resample(validation,y_val)
 
 
     if type == 'excel':
