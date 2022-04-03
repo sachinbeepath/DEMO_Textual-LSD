@@ -15,11 +15,7 @@ class multitaskNet(nn.Module):
         self.pos_emb = nn.Embedding(sent_len, embed_len)
         if w2v is not None:
             self.word_emb = nn.Embedding(vocab_size, embed_len, pad_idx)
-<<<<<<< HEAD
             self.word_emb.load_state_dict({'weight' : w2v})
-=======
-            self.word_emb.load_state_dict({'weight': w2v})
->>>>>>> 6946f99876ea1b77ac9081e16eab5931227e6aec
         else:
             self.word_emb = nn.Embedding(vocab_size, embed_len, pad_idx)
         self.enc_manual = trans.Encoder(vocab_size, embed_len, num_layers, att_heads, mult, dropout, sent_len, device, w2v)
