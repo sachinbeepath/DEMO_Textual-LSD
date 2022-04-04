@@ -357,7 +357,7 @@ class Textual_LSD_TVT():
 
     def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None, 
                 show_preds=False, show_acc=True, show_loss=True, show_time=True, 
-                enc_version=1, validation_freq=None, val_acc=True, val_cm=True, val_prf=False, 
+                enc_version=1, validation_freq=1, val_acc=True, val_cm=True, val_prf=False, 
                 save_folder=None, start_epoch=0):
         '''
         Trains the network
@@ -512,7 +512,7 @@ class Textual_LSD_TVT():
             TP = np.diag(C)
             FP = np.sum(C, axis=0) - TP
             FN = np.sum(C, axis=1) - TP
-            print(TP, FP, FN)
+            #print(TP, FP, FN)
 
         precision = TP/(TP+FP)
         recall = TP/(TP+FN)
@@ -597,8 +597,8 @@ class Textual_LSD_TVT():
         if prnt_prf:
             print('Per-label precision, recall, and f-score of base quadrant predictions: {},{},{}'.format(np.round(p_raw,3),np.round(r_raw,3),np.round(f_raw,3)))
             print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
-            print('Precision, recall, and f-score valence predictions: {},{},{}'.format(round(p_val,3),round(r_val,3),round(f_val,3)))
-            print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(round(p_aro,3),round(r_aro,3),round(f_aro,3)))
+            print('Per-label precision, recall, and f-score valence predictions: {},{},{}'.format(np.round(p_val,3),np.round(r_val,3),np.round(f_val,3)))
+            print('Per-label precision, recall, and f-score of arousal predictions: {},{},{}'.format(np.round(p_aro,3),np.round(r_aro,3),np.round(f_aro,3)))
         self.multitask.train()
         if ret_acc:
             return (correct_raw + correct_am) / (2 * total)
@@ -666,7 +666,7 @@ def get_quad(df,A_thresh=5,V_thresh=5):
         return 'LR'
 
 
-def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
+def generate_test_val(dataframe, split, fnames, type='excel',oversample=False, balance_test=False):
     '''
     Creates seperate files for train and val sets.
 
@@ -677,6 +677,7 @@ def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
     fnames : list<string> - name for each train and val file, inluding extension
     type : string - type of save format (excel, csv, pickle)
     oversample: Bool - whether to oversample for class imbalance
+    balance_test: Bool - whether to balance the test set or not
     '''
     assert isinstance(dataframe, pd.DataFrame), 'Not a dataframe!'
     assert type in ['excel', 'csv', 'pickle'], 'invalid save format!'
@@ -700,6 +701,14 @@ def generate_test_val(dataframe, split, fnames, type='excel',oversample=False):
         ros = RandomOverSampler()
         #update training data with oversampling
         train, Y_bal = ros.fit_resample(train,y)
+
+    
+    if balance_test ==True:
+        y_val=validation.apply(get_quad,axis=1)
+        #intialise oversampler
+        ros = RandomOverSampler()
+        #update training data with oversampling
+        validation, Y_bal = ros.fit_resample(validation,y_val)
 
 
     if type == 'excel':
