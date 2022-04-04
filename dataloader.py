@@ -164,9 +164,8 @@ class LSD_DataLoader(Dataset):
 
             if tokenize == False:
                 words = sentence.split(sep)
-            else:
+            elif tokenize == 'pretrained':
                 words = tokenizer.tokenize(sentence)
-                #print(words)
                 if len(words) > length:
                     words = words[:length]
                 #if stem:
@@ -177,6 +176,10 @@ class LSD_DataLoader(Dataset):
                 words.append('</s>')
                 words = tokenizer.convert_tokens_to_ids(words)
                 return np.array(words)
+            else:
+                words = tokenizer(sentence)
+                
+                
  
         else:
             words = sentence 
