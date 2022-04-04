@@ -1,4 +1,3 @@
-from audioop import bias
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,11 +14,7 @@ class multitaskNet(nn.Module):
         self.pos_emb = nn.Embedding(sent_len, embed_len)
         if w2v is not None:
             self.word_emb = nn.Embedding(vocab_size, embed_len, pad_idx)
-<<<<<<< HEAD
-            self.word_emb.load_state_dict({'weight': w2v})
-=======
             self.word_emb.load_state_dict({'weight' : w2v})
->>>>>>> 08d3525673deb66e89e69e7985da3117c7371430
         else:
             self.word_emb = nn.Embedding(vocab_size, embed_len, pad_idx)
         self.enc_manual = trans.Encoder(vocab_size, embed_len, num_layers, att_heads, mult, dropout, sent_len, device, w2v)
