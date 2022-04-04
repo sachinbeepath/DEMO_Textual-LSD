@@ -55,7 +55,8 @@ class multitaskNet(nn.Module):
             out = self.enc_manual(x)
         elif version == 2:
             with torch.no_grad():
-                out = self.pretrained_trans(x)[1]
+                out = self.pretrained_trans(x)
+                print(out)
 
         out = self.sequence_summary(out)                #BxH
         out = self.fc_1(out)                            #BxH
