@@ -165,7 +165,17 @@ class LSD_DataLoader(Dataset):
             if tokenize == False:
                 words = sentence.split(sep)
             else:
-                words = tokenizer(sentence)
+                words = tokenizer.tokenize(sentence)
+                if len(words) > length:
+                    words = words[:length]
+                if stem:
+                    words = [stemmer(word) for word in words]
+                while len(words) < length:
+                    words.append('<pad>')
+                words.insert(0, '<s>')
+                words.append('</s>')
+                words = tokenizer.convert_tokens_to_ids(words)
+ 
         else:
             words = sentence 
 
@@ -177,8 +187,9 @@ class LSD_DataLoader(Dataset):
 
         while len(words) < length:
             words.append(pad_token)
-        words.insert(0, start_token)
-        words.append(end_token)
+        if start_token is not None and end_token is not None:
+            words.insert(0, start_token)
+            words.append(end_token)
         return np.array(words)
 
 
