@@ -175,6 +175,7 @@ class LSD_DataLoader(Dataset):
                 words.insert(0, '<s>')
                 words.append('</s>')
                 words = tokenizer.convert_tokens_to_ids(words)
+                return np.array(words)
  
         else:
             words = sentence 
