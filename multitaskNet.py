@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import transformer as trans
 import Transformer_aladdinpersson as trans_2
-from transformers import XLNetTokenizer, XLNetForSequenceClassification, XLNetModel, AdamW
+#from transformers import XLNetTokenizer, XLNetForSequenceClassification, XLNetModel, AdamW
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -23,7 +23,7 @@ class multitaskNet(nn.Module):
         self.enc_manual.double()
         enc_layer = nn.TransformerEncoderLayer(embed_len, att_heads, mult, dropout, batch_first=True)
         self.enc = nn.TransformerEncoder(enc_layer, num_layers)
-        self.pretrained_trans = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased", num_labels=embed_len)
+        #self.pretrained_trans = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased", num_labels=embed_len)
         self.use_dom = dom
         self.dropout = nn.Dropout(dropout)
         self.sequence_summary = nn.Sequential(
@@ -56,7 +56,7 @@ class multitaskNet(nn.Module):
         elif version == 2:
             with torch.no_grad():
                 out = self.pretrained_trans(x).logits
-                print(out)
+        #print(out.shape)        
 
         out = self.sequence_summary(out)                #BxH
         out = self.fc_1(out)                            #BxH
