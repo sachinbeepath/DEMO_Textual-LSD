@@ -23,7 +23,7 @@ class multitaskNet(nn.Module):
         self.enc_manual.double()
         enc_layer = nn.TransformerEncoderLayer(embed_len, att_heads, mult, dropout, batch_first=True)
         self.enc = nn.TransformerEncoder(enc_layer, num_layers)
-        self.pretrained_trans = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased", num_labels=embed_len)
+        self.pretrained_trans = torch.no_grad(XLNetForSequenceClassification.from_pretrained("xlnet-base-cased", num_labels=embed_len))
         self.use_dom = dom
         self.dropout = nn.Dropout(dropout)
         self.sequence_summary = nn.Sequential(
