@@ -165,6 +165,7 @@ class LSD_DataLoader(Dataset):
             if tokenize == False:
                 words = sentence.split(sep)
             else:
+                print("using tokenizer")
                 words = tokenizer.tokenize(sentence)
                 if len(words) > length:
                     words = words[:length]
