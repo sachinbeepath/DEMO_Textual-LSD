@@ -562,9 +562,6 @@ class Textual_LSD_TVT():
             quad_pred_am = self.ArgMax_to_quadrant(val_pred, aro_pred).numpy()
             quad_pred_raw = torch.argmax(quad_pred_raw, dim=1).detach().cpu().numpy()
             quad = quad.detach().cpu().numpy()
-            #print(quad_pred_am)
-            #print(quad)
-            print("")
 
             total += inp_data.shape[0]
             for i in range(inp_data.shape[0]):
