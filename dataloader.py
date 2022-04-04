@@ -165,12 +165,12 @@ class LSD_DataLoader(Dataset):
             if tokenize == False:
                 words = sentence.split(sep)
             else:
-                print("using tokenizer")
                 words = tokenizer.tokenize(sentence)
+                #print(words)
                 if len(words) > length:
                     words = words[:length]
-                if stem:
-                    words = [stemmer(word) for word in words]
+                #if stem:
+                  #  words = [stemmer(word) for word in words]
                 while len(words) < length:
                     words.append('<pad>')
                 words.insert(0, '<s>')
