@@ -414,7 +414,7 @@ class Textual_LSD_TVT():
                 quad_loss = self.quad_L(quad_pred, quad)
                 loss = arousal_loss + valence_loss + dominance_loss + quad_loss
                 loss.backward()
-                #torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
+                #torch.nn.utils.clip_grad_norm_(self.multitask.parameters(), max_norm=1)
                 self.optim.step()
                 epoch_l.append(loss.item())
                 # Calcuate Accuracy
@@ -528,7 +528,7 @@ class Textual_LSD_TVT():
         '''
         self.test_losses = []
         # Testing Loop
-        self.multitask.eval()
+        #self.multitask.eval()
         total = 0
         correct_raw = 0
         correct_am = 0
@@ -597,8 +597,8 @@ class Textual_LSD_TVT():
         if prnt_prf:
             print('Per-label precision, recall, and f-score of base quadrant predictions: {},{},{}'.format(np.round(p_raw,3),np.round(r_raw,3),np.round(f_raw,3)))
             print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
-            print('Precision, recall, and f-score valence predictions: {},{},{}'.format(np.round(p_val,3),np.round(r_val,3),np.round(f_val,3)))
-            print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(np.round(p_aro,3),np.round(r_aro,3),np.round(f_aro,3)))
+            print('Per-label precision, recall, and f-score valence predictions: {},{},{}'.format(np.round(p_val,3),np.round(r_val,3),np.round(f_val,3)))
+            print('Per-label precision, recall, and f-score of arousal predictions: {},{},{}'.format(np.round(p_aro,3),np.round(r_aro,3),np.round(f_aro,3)))
         self.multitask.train()
         if ret_acc:
             return (correct_raw + correct_am) / (2 * total)
