@@ -202,6 +202,7 @@ class Textual_LSD_TVT():
         dataset.clean_lyrics(remove_between_brackets=remove_between_brackets, stem=stem, stemmer=self.stemmer, 
                                 tokenize=tokenize, tokenizer=tokenizer, length=max_length)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        print(dataset)
 
         if validation == False:
             self.dataset = dataset
