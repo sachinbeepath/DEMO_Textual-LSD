@@ -513,7 +513,7 @@ class Textual_LSD_TVT():
         TP = np.diag(C)
         FP = np.sum(C, axis=0) - TP
         FN = np.sum(C, axis=1) - TP
-        print(TP, FP, FN)
+        #print(TP, FP, FN)
 
         precision = TP/(TP+FP)
         recall = TP/(TP+FN)
