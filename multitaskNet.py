@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import transformer as trans
 import Transformer_aladdinpersson as trans_2
-#from transformers import XLNetTokenizer, XLNetForSequenceClassification, XLNetModel, AdamW
+from transformers import XLNetTokenizer, XLNetForSequenceClassification, XLNetModel, AdamW
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -22,15 +22,16 @@ class multitaskNet(nn.Module):
         self.enc_manual.double()
         enc_layer = nn.TransformerEncoderLayer(embed_len, att_heads, mult, dropout, batch_first=True)
         self.enc = nn.TransformerEncoder(enc_layer, num_layers)
-        #self.pretrained_trans = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased", num_labels=embed_len)
+        self.pretrained_trans = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased", num_labels=embed_len)
         self.use_dom = dom
         self.dropout = nn.Dropout(dropout)
+        self.flt = nn.Flatten()
         self.sequence_summary = nn.Sequential(
-                                            nn.Flatten(), #flatten sequence, heads and embedding dimensions
                                             nn.Linear(sent_len * embed_len, embed_len), # first linear stage compresses sequence dim
                                             nn.ReLU(),
                                             nn.Linear(embed_len, 2 * hidden_size)                         # sencond stage compresses embedding dim
                                             )
+        self.sequence_summary_2 = nn.Linear(embed_len, 2 * hidden_size)
         
         self.fc_1 = nn.Sequential(nn.ReLU(), nn.Dropout(dropout), nn.Linear(2 * hidden_size, hidden_size))
         self.fc_valence = nn.Linear(hidden_size, 2, bias=False)
@@ -49,15 +50,17 @@ class multitaskNet(nn.Module):
             positions = torch.arange(0,seq_length).expand(N,seq_length).to(self.device)
             x = self.dropout(self.word_emb(x) + self.pos_emb(positions))
             #Now run transformer encoders
-            out = self.enc(x)  #BxLxHxE
+            out = self.flt(self.enc(x))  #BxLxHxE
+            out = self.sequence_summary(out) 
         elif version == 1:
-            out = self.enc_manual(x)
+            out = self.flt(self.enc_manual(x))
+            out = self.sequence_summary(out) 
+
         elif version == 2:
             with torch.no_grad():
                 out = self.pretrained_trans(x).logits
-        #print(out.shape)        
-
-        out = self.sequence_summary(out)                #BxH
+            out = self.sequence_summary_2(out) 
+                       #BxH
         out = self.fc_1(out)                            #BxH
         valence = self.fc_valence(out)                  #Bx2 for the rest
         arousal = self.fc_arousal(out)
