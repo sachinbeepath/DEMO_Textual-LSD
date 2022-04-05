@@ -507,13 +507,13 @@ class Textual_LSD_TVT():
         Calculates precision, recall and f-score from a confusion matrix
         """
         
-        if C.shape == (2,2):
-            TN,FP,FN,TP = C.ravel()
-        else:
-            TP = np.diag(C)
-            FP = np.sum(C, axis=0) - TP
-            FN = np.sum(C, axis=1) - TP
-            #print(TP, FP, FN)
+        #if C.shape == (2,2):
+         #   TN,FP,FN,TP = C.ravel()
+        #else:
+        TP = np.diag(C)
+        FP = np.sum(C, axis=0) - TP
+        FN = np.sum(C, axis=1) - TP
+        print(TP, FP, FN)
 
         precision = TP/(TP+FP)
         recall = TP/(TP+FN)
@@ -541,6 +541,7 @@ class Textual_LSD_TVT():
 
         self.Cmat_val = np.zeros((2,2))
         self.Cmat_aro = np.zeros((2,2))
+        self.Cmat_dom = np.zeros((2,2))
 
         labels = [0,1,2,3]
 
@@ -580,11 +581,13 @@ class Textual_LSD_TVT():
             
             self.Cmat_val += confusion_matrix(val.cpu(), val_pred.cpu(),labels=[0,1])
             self.Cmat_aro += confusion_matrix(aro.cpu(), aro_pred.cpu(),labels=[0,1])
+            self.Cmat_dom += confusion_matrix(aro.cpu(), aro_pred.cpu(),labels=[0,1])
 
         p_raw, r_raw, f_raw = self.p_r_f(self.Cmat_raw)
         p_am, r_am, f_am = self.p_r_f(self.Cmat_am)
         p_val, r_val, f_val = self.p_r_f(self.Cmat_val)
         p_aro, r_aro, f_aro = self.p_r_f(self.Cmat_aro)
+        p_dom, r_dom, f_dom = self.p_r_f(self.Cmat_dom)
 
         self.acc_raw = 100 * correct_raw / total
         self.acc_am = 100 * correct_am / total
@@ -603,6 +606,7 @@ class Textual_LSD_TVT():
             print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
             print('Precision, recall, and f-score valence predictions: {},{},{}'.format(np.round(p_val,3),np.round(r_val,3),np.round(f_val,3)))
             print('Precision, recall, and f-score of arousal predictions: {},{},{}'.format(np.round(p_aro,3),np.round(r_aro,3),np.round(f_aro,3)))
+            print('Precision, recall, and f-score of dominance predictions: {},{},{}'.format(np.round(p_dom,3),np.round(r_dom,3),np.round(f_dom,3)))
         self.multitask.train()
         if ret_acc:
             return (correct_raw + correct_am) / (2 * total)
