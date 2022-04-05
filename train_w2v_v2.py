@@ -19,7 +19,7 @@ print('Using ', DEVICE)
 trainer = utils.Textual_LSD_TVT(verbose=True)
 
 trainer.load_dataset(FILENAME, MAXLENGTH, BATCH_SIZE)
-trainer.load_vocab('Pickles/Balanced_Vocab.pkl')
+trainer.load_vocab('Pickles/NewVocab.pkl')
 
 corpus = trainer.dataframe
 lyrics = corpus.lyrics
@@ -40,9 +40,9 @@ VOCAB_LEN = len(words)
 
 # build w2v model
 cores = multiprocessing.cpu_count() # Count the number of cores in a computer
-w2v_model = Word2Vec(min_count=5,
+w2v_model = Word2Vec(min_count=60,
                      window=7,
-                     size=EMBEDDING_SIZE,
+                     vector_size=EMBEDDING_SIZE,
                      sample=6e-5,
                      alpha=0.03,
                      min_alpha=0.0007,
@@ -51,7 +51,7 @@ w2v_model = Word2Vec(min_count=5,
 
 w2v_model.build_vocab(lyrics, progress_per=10000)
 
-w2v_model.train(lyrics, total_examples=w2v_model.corpus_count, epochs=30, report_delay=1)
+w2v_model.train(lyrics, total_examples=w2v_model.corpus_count, epochs=20, report_delay=1)
 
 weights_matrix = np.zeros((VOCAB_LEN, EMBEDDING_SIZE))
 words_found = 0
@@ -64,4 +64,4 @@ for i, word in enumerate(words):
         weights_matrix[i] = np.random.normal(scale=0.6, size=(1,EMBEDDING_SIZE))
 
 weights_matrix = torch.tensor(weights_matrix, requires_grad=True)
-torch.save(weights_matrix, 'w2v_weights.pkl',pickle_module= pickle)
+torch.save(weights_matrix, 'w2v_weights_small_vocab.pkl',pickle_module= pickle)
