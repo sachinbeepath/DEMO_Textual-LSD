@@ -40,15 +40,9 @@ VOCAB_LEN = len(words)
 
 # build w2v model
 cores = multiprocessing.cpu_count() # Count the number of cores in a computer
-<<<<<<< HEAD
-w2v_model = Word2Vec(min_count=60,
-                     window=7,
-                     vector_size=EMBEDDING_SIZE,
-=======
 w2v_model = Word2Vec(min_count=10,
                      window=10,
                      size=EMBEDDING_SIZE,
->>>>>>> 30b353fb165b7969be8b527dd1ef062c7e9a914f
                      sample=6e-5,
                      alpha=0.03,
                      min_alpha=0.0007,
@@ -70,8 +64,4 @@ for i, word in enumerate(words):
         weights_matrix[i] = np.random.normal(scale=0.6, size=(1,EMBEDDING_SIZE))
 
 weights_matrix = torch.tensor(weights_matrix, requires_grad=True)
-<<<<<<< HEAD
-torch.save(weights_matrix, 'w2v_weights_small_vocab.pkl',pickle_module= pickle)
-=======
 torch.save(weights_matrix, 'w2v_window10_min10_iter10.pkl',pickle_module= pickle)
->>>>>>> 30b353fb165b7969be8b527dd1ef062c7e9a914f
