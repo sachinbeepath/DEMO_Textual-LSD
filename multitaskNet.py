@@ -85,7 +85,7 @@ class BiLSTMSentiment(nn.Module):
         else:
             self.embeddings = nn.Embedding(vocab_size, embed_len, pad_idx)
         self.lstm = nn.LSTM(input_size=embed_len, hidden_size=hidden_size, bidirectional=True, dropout=dropout, batch_first=True,
-                            num_layers=2)
+                            num_layers=2, device=device)
         self.hidden = self.init_hidden(self.batch_size)
         self.use_dom = dom
         self.dropout = nn.Dropout(dropout)
