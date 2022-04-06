@@ -675,41 +675,34 @@ class Textual_LSD_TVT():
                 #torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
                 self.optim.step()
                 epoch_l.append(loss.item())
-                # Calcuate Accuracy
-                # total += inp_data.shape[0]
-                # TOTAL += inp_data.shape[0]
-                # for i in range(inp_data.shape[0]):
-                #     correct += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
-                #     CORRECT += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
-                #
-                # if (batch_idx + 1) % print_step == 0:
-                #     if self.verbose:
-                #         print(f'Batch {batch_idx + 1} / {len(self.dataloader)}')
-                #     if show_preds:
-                #         print('VAL pred/true', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
-                #         print('ARO pred/true', output[1, :2].detach().cpu().numpy(), aro[:2].detach().cpu().numpy())
-                #         print('DOM pred/true', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
-                #         print('Quadrant pred/true', np.argmax(quad_pred.detach().cpu().numpy(), axis=1), quad.detach().cpu().numpy())
-                #     if show_loss:
-                #         print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
-                #     if show_acc:
-                #         print(f'Batch Accuracy: {100 * correct / total:.2f}%')
-                #     print('')
-                # if (batch_idx + 1) % save_step == 0:
-                #     self.losses.append(np.average(epoch_l[-save_step:]))
-                #     if batch_idx != len(self.dataloader) and (epoch + 1) % 8 == 0 : #ignore final batch since differnt size
-                #         self.valpoints.append(torch.squeeze(torch.softmax(output, dim=2)[0, :, 0]).detach().cpu().numpy())
-                #         self.aropoints.append(torch.squeeze(torch.softmax(output, dim=2)[1, :, 0]).detach().cpu().numpy())
-                #     self.accuracy.append(correct / total)
-                #     self.val_accuracy.append(self.val_accuracy[-1])
-                #     total, correct = 0, 0
-                #     self.scheduler.step(self.losses[-1])
-            # if show_time:
-            #     print(f'Epoch Time: {time.time() - t:.1f}s')
-            #     print('')
-            # if show_acc:
-            #     print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
-            #
+                #Calcuate Accuracy
+                total += inp_data.shape[0]
+                TOTAL += inp_data.shape[0]
+                for i in range(inp_data.shape[0]):
+                    correct += 1 if np.argmax(output[i].detach().cpu().numpy()) == target[i] else 0
+                    CORRECT += 1 if np.argmax(output[i].detach().cpu().numpy()) == target[i] else 0
+                
+                if (batch_idx + 1) % print_step == 0:
+                    if self.verbose:
+                        print(f'Batch {batch_idx + 1} / {len(self.dataloader)}')
+                    if show_preds:
+                        print('pred/true', output[0].detach().cpu().numpy(), target[0].detach().cpu().numpy())
+                    if show_loss:
+                        print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
+                    if show_acc:
+                        print(f'Batch Accuracy: {100 * correct / total:.2f}%')
+                    print('')
+                if (batch_idx + 1) % save_step == 0:
+                    self.losses.append(np.average(epoch_l[-save_step:]))
+                    self.accuracy.append(correct / total)
+                    total, correct = 0, 0
+                    self.scheduler.step(self.losses[-1])
+            if show_time:
+                print(f'Epoch Time: {time.time() - t:.1f}s')
+                print('')
+            if show_acc:
+                print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
+            
             # if (epoch + 1) % validation_freq == 0:
             #     self.optim.zero_grad()
             #     self.val_accuracy.append(self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False, ret_acc=True))
@@ -864,6 +857,54 @@ class Textual_LSD_TVT():
         self.multitask.train()
         if ret_acc:
             return (correct_raw + correct_am) / (2 * total)
+        return
+
+    def test_single_task(self, enc_version=1, prnt_acc=True, prnt_cm=True, prnt_prf=True, show_progress=True, ret_acc=False):
+        '''
+        Performs and evaluation run on the dataset, recording accuracy, confusion matrices and Precision/Recall/F-score.
+        enc_version : 0 or 1 - 0 -> pytorch implementation of transformer, 1 -> manually-coded transformer
+        prnt_... : Bool - whether to print the specified statistic at the end of testing
+        '''
+        self.test_losses = []
+        # Testing Loop
+        #self.multitask.eval()
+        total = 0
+        correct = 0
+        cm = None
+
+        for batch_idx, batch in enumerate(self.validation_dataloader):
+            if show_progress:
+                self.__printc('Testing:')
+                print(f'{100 * batch_idx / len(self.validation_dataloader):.1f}% Complete')
+            
+            inp_data = batch['lyrics'].to(self.device)
+            val = batch['valence_tags'].long().to(self.device)
+            aro = batch['arousal_tags'].long().to(self.device)
+            dom = batch['dominance_tags'].long().to(self.device)
+            quad = self.VA_to_quadrant(val, aro).to(self.device)
+
+            output = self.multitask(inp_data, version=enc_version)
+
+            if self.use_valence:
+                target = val
+            if self.use_arousal:
+                target = aro
+            if self.use_dom:
+                target = dom
+            if self.use_quad:
+                target = quad
+
+            total += inp_data.shape[0]
+            for i in range(inp_data.shape[0]):
+                correct += 1 if np.argmax(output[i].detach().cpu().numpy()) == target[i] else 0
+            
+            if cm == None:
+                cm = confusion_matrix(target, np.argmax(output.detach().cpu().numpy()))
+            else:
+                cm += confusion_matrix(target, np.argmax(output.detach().cpu().numpy()))
+
+        print(f'Validation Accuracy (Single Task) = {100 * correct / total :.2f}')
+        print(cm)
         return
 
                 
