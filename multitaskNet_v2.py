@@ -1,10 +1,10 @@
 from audioop import bias
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+# import torch.nn.functional as F
 import transformer as trans
-import Transformer_aladdinpersson as trans_2
-#from transformers import XLNetTokenizer, XLNetForSequenceClassification, XLNetModel, AdamW
+# import Transformer_aladdinpersson as trans_2
+# from transformers import XLNetTokenizer, XLNetForSequenceClassification, XLNetModel, AdamW
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -60,22 +60,14 @@ class multitaskNet(nn.Module):
             with torch.no_grad():
                 out = self.pretrained_trans(x).logits
         #print(out.shape)        
-        valence,arousal,dominance,quad = None,None,None,None
 
         out = self.sequence_summary(out)                #BxH
         out = self.fc_1(out)                            #BxH
-        if self.use_valence:
-            valence = self.fc_valence(out)
-        if self.use_arousal:
-            arousal = self.fc_arousal(out)
         if self.use_quad:
-            quad = self.fc_quad(out)
+            return self.fc_quad(out)
+        if self.use_valence:
+            return self.fc_valence(out)
+        if self.use_arousal:
+            return self.fc_arousal(out)
         if self.use_dom:
-            dominance = self.fc_dominance(out)
-
-        output = []
-        for item in [valence,arousal,dominance]:
-            if item is not None:
-                output.append(item)
-
-        return torch.stack(output) , quad
+            return self.use_dom(out)
