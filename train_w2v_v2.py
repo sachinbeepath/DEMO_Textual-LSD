@@ -40,18 +40,18 @@ VOCAB_LEN = len(words)
 
 # build w2v model
 cores = multiprocessing.cpu_count() # Count the number of cores in a computer
-w2v_model = Word2Vec(min_count=10,
+w2v_model = Word2Vec(min_count=0,
                      window=10,
                      size=EMBEDDING_SIZE,
                      sample=6e-5,
                      alpha=0.03,
                      min_alpha=0.0007,
                      workers=cores-1,
-                     iter = 10)
+                     iter = 20)
 
 w2v_model.build_vocab(lyrics, progress_per=10000)
 
-w2v_model.train(lyrics, total_examples=w2v_model.corpus_count, epochs=30, report_delay=1)
+w2v_model.train(lyrics, total_examples=w2v_model.corpus_count, epochs=20, report_delay=1)
 
 weights_matrix = np.zeros((VOCAB_LEN, EMBEDDING_SIZE))
 words_found = 0
@@ -64,4 +64,8 @@ for i, word in enumerate(words):
         weights_matrix[i] = np.random.normal(scale=0.6, size=(1,EMBEDDING_SIZE))
 
 weights_matrix = torch.tensor(weights_matrix, requires_grad=True)
+<<<<<<< HEAD
 torch.save(weights_matrix, 'w2v_window10_min10_iter10.pkl',pickle_module= pickle)
+=======
+torch.save(weights_matrix, 'w2v_window10_min0_iter20.pkl',pickle_module= pickle)
+>>>>>>> 21878442c01f7f7c8ba02f152d5899c817cd9d59
