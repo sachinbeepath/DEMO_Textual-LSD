@@ -7,6 +7,7 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import dataloader as dl
 import multitaskNet as mtn
+import multitaskNet_v2 as mtn_v2
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
@@ -265,11 +266,32 @@ class Textual_LSD_TVT():
             print(f'Successfully Loaded {fname} into vocabulary')
         return
 
-    def generate_models(self, emb_size, att_heads, drp, dom, lr, mt_heads, num_enc, 
+    def load_models(self, fname, lr, lr_fact=0.2, lr_pat=10, lr_verbose=True, train=True):
+        '''
+        Loads in a pretrained model
+        Parameters
+        ----------------
+        fname : string - filename of model state-dict to be loaded (including .pt)
+        lr : learning rate to use
+        lr_fact : float - learning rate multiplyer in LR Scheduler
+        lr_pat : int - learning rate scheduler patience
+        lr_verbose : bool - learning rate scheduler set verbose value
+        train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
+        '''
+        if self.verbose:
+            print('Starting Load Models...')
+        self.multitask.load_state_dict(torch.load(fname, map_location=self.device))
+        if train:
+            self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+        if self.verbose:
+            print('Models Loaded')
+        return
+
+    def generate_models(self, emb_size, att_heads, drp, dom, lr, mt_heads, num_enc,
                         forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True, w2v=None, train=True):
         '''
         Generates a new network model with random weights
-
         Parameters
         ---------------
         emb_size : int - size of embedding vectors to generate
@@ -294,8 +316,8 @@ class Textual_LSD_TVT():
         assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
         assert self.pad_idx is not None, 'Please generate or load a vocabulary before training'
 
-        self.multitask = mtn.multitaskNet(mt_heads, self.max_length+2, emb_size, drp, dev, 
-                                self.vocab_len, num_enc, att_heads, forw_exp, 
+        self.multitask = mtn.multitaskNet(mt_heads, self.max_length+2, emb_size, drp, dev,
+                                self.vocab_len, num_enc, att_heads, forw_exp,
                                 self.pad_idx, dom, w2v).to(dev)
         self.multitask.double()
 
@@ -312,7 +334,96 @@ class Textual_LSD_TVT():
         self.use_dom = dom
         if self.verbose:
             print('Models Generated Successfully')
-        return 
+        return
+
+    def generate_single_model(self, emb_size, att_heads, drp, valence, arousal, dom, quad, lr, mt_heads, num_enc,
+                        forw_exp, dev, lr_fact=0.2, lr_pat=10, lr_verbose=True, w2v=None, train=True):
+        '''
+        Generates a new network model with random weights
+
+        Parameters
+        ---------------
+        emb_size : int - size of embedding vectors to generate
+        att_heads : int - number of attention heads (emb_size % att_heads = 0)
+        drp : float 0-1 - dropout fraction
+        valence : bool - whether to use Valence dimension in model
+        arousal: bool - whether to use Arousal dimension in model
+        dom : bool - whether to use Dominance dimension in model
+        quad : bool - whether to use quadrant dimension in model
+        lr : float - learning rate
+        mt_heads : int - number of feature layers to generate in final multitask stage
+        num_enc : int - number of encoder layers to use
+        forw_exp : int - forward expansion rate in feed-forward layer
+        dev : Cuda.Device - CPU or GPU
+        lr_fact : float - learning rate multiplyer in LR Scheduler
+        lr_pat : int - learning rate scheduler patience
+        lr_verbose : bool - learning rate scheduler set verbose value
+        w2v : torch.Tensor - Tensor containing Word2Vec embedding weights. This will replace the nn.Embedding weights if not set to None
+        train : bool - whether this is for training for testing. If testing, no loss functions or optimizers will be generated
+        '''
+        self.model_name = f'emb{emb_size}att{att_heads}mt{mt_heads}fx{forw_exp}len{self.max_length}drp{str(drp).replace(".","")}dom{1*dom}'
+        print(self.model_name)
+        if self.verbose:
+            print('Starting Generate Models...')
+        assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
+        assert self.pad_idx is not None, 'Please generate or load a vocabulary before training'
+
+        self.multitask = mtn_v2.multitaskNet(mt_heads, self.max_length + 2, emb_size, drp, dev,
+                                           self.vocab_len, num_enc, att_heads, forw_exp,
+                                           self.pad_idx,valence, arousal, dom, quad, w2v).to(dev)
+
+        self.multitask.double()
+
+        if train:
+            self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+
+            self.valence_L = nn.CrossEntropyLoss()
+            self.arousal_L = nn.CrossEntropyLoss()
+            self.dominance_L = nn.CrossEntropyLoss()
+            self.quad_L = nn.CrossEntropyLoss()
+
+        self.device = dev
+        self.use_valence = valence
+        self.use_arousal = arousal
+        self.use_dom = dom
+        self.use_quad = quad
+        if self.verbose:
+            print('Models Generated Successfully')
+        return
+
+    def generate_models_lstm(self, emb_size, batch_size, drp,dom,lr,dev, lr_fact=0.2, lr_pat=10, lr_verbose=True,
+                             w2v=None, train=True):
+        self.num_layers = 2
+
+        self.model_name = f'emb{emb_size}len{self.max_length}drp{str(drp).replace(".","")}dom{1*dom}'
+        print(self.model_name)
+        if self.verbose:
+            print('Starting Generate Models...')
+        assert self.vocab_len is not None, 'Please generate or load a vocabulary before training'
+        assert self.pad_idx is not None, 'Please generate or load a vocabulary before training'
+
+        self.multitask = mtn.BiLSTMSentiment(emb_size,batch_size, emb_size, drp,dev,self.vocab_len,
+                                                 self.pad_idx, dom,w2v)
+
+        self.multitask.double()
+
+        if train:
+            self.optim = optim.AdamW(self.multitask.parameters(), lr=lr) # Fine tune this hypPs...
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=lr_fact, patience=lr_pat, verbose=lr_verbose)
+
+            self.valence_L = nn.CrossEntropyLoss()
+            self.arousal_L = nn.CrossEntropyLoss()
+            self.dominance_L = nn.CrossEntropyLoss()
+            self.quad_L = nn.CrossEntropyLoss()
+
+        self.device = dev
+        self.use_dom = dom
+        if self.verbose:
+            print('Models Generated Successfully')
+        return
+
+
 
     def load_models(self, fname, lr, lr_fact=0.2, lr_pat=10, lr_verbose=True, train=True):
         '''
@@ -356,9 +467,148 @@ class Textual_LSD_TVT():
                     quads.append(2)
         return torch.tensor(quads)
 
-    def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None, 
-                show_preds=False, show_acc=True, show_loss=True, show_time=True, 
-                enc_version=1, validation_freq=1, val_acc=True, val_cm=True, val_prf=False, 
+    def train(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None,
+              show_preds=False, show_acc=True, show_loss=True, show_time=True,
+              enc_version=1, validation_freq=1, val_acc=True, val_cm=True, val_prf=False,
+              save_folder=None, start_epoch=0):
+        '''
+        Trains the network
+        Parameters
+        --------------
+        epochs : int - number of epochs to train
+        print_step : int - print data every N batches (averaged since previous print)
+        save_step : int - save data every N batches (averaged since previous save)
+        save_name : string - filename to save model under (including .pt)
+        save_epochs : int - every Nth epoch the model weights will be saved.
+        show_preds : bool - whether to print predictions on print_step
+        show_acc : bool - whether to print accuracy on print_step
+        show_loss : bool - whether to print loss on print_step
+        show_time : bool - whether to print the time taken per epoch
+        enc_version : binary - 0=Pytorch implementation of transformer, 1=Manually coded transformer
+        validation_freq : int - every Nth epoch the model will run a validation test. Ensure validation data is loaded
+        val_acc : bool - whether to print accuracy after validation run
+        val_cm : bool - whether to print confusion matrices after validation run
+        val_prf : bool - whether to print precision/recall/F-score after validation run
+        save_folder : string - path to desired save location, e.g. "Weights/"
+        start_epoch : int - the starting point for epoch labelling. Used if continuing training
+        '''
+        self.model_name = self.model_name + f'eps{epochs + start_epoch}.pt'
+        if save_folder is not None:
+            self.model_name = save_folder + self.model_name
+        if self.verbose:
+            print(f'Number of batches per epoch: {len(self.dataloader)}')
+            print(f'Printing every {print_step} batches, saving every {save_step} batches')
+
+        # Training loop
+        self.multitask.train()
+        for epoch in range(epochs):
+            total = 0
+            correct = 0
+            TOTAL = 0
+            CORRECT = 0
+            print(f'Epoch {epoch + 1 + start_epoch} / {epochs + start_epoch}')
+            t_0 = time.time()
+            t = time.time()
+            epoch_l = []
+            for batch_idx, batch in enumerate(self.dataloader):
+                inp_data = batch['lyrics'].to(self.device)
+                val = batch['valence_tags'].long().to(self.device)
+                aro = batch['arousal_tags'].long().to(self.device)
+                dom = batch['dominance_tags'].long().to(self.device)
+                quad = self.VA_to_quadrant(val, aro).to(self.device)
+                output, quad_pred = self.multitask(inp_data, version=enc_version)
+                self.optim.zero_grad()
+
+                valence_loss = self.valence_L(output[0], val)
+                arousal_loss = self.arousal_L(output[1], aro)
+                dominance_loss = self.dominance_L(output[2], dom) if self.use_dom == True else torch.tensor([0]).to(
+                    self.device)
+                quad_loss = self.quad_L(quad_pred, quad)
+                loss = arousal_loss + valence_loss + dominance_loss + quad_loss
+                loss.backward()
+                # torch.nn.utils.clip_grad_norm_(self.multitask.parameters(), max_norm=1)
+                self.optim.step()
+                epoch_l.append(loss.item())
+                # Calcuate Accuracy
+                total += inp_data.shape[0]
+                TOTAL += inp_data.shape[0]
+                for i in range(inp_data.shape[0]):
+                    correct += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
+                    CORRECT += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
+
+                if (batch_idx + 1) % print_step == 0:
+                    if self.verbose:
+                        print(f'Batch {batch_idx + 1} / {len(self.dataloader)}')
+                    if show_preds:
+                        print('VAL pred/true', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
+                        print('ARO pred/true', output[1, :2].detach().cpu().numpy(), aro[:2].detach().cpu().numpy())
+                        print('DOM pred/true', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
+                        print('Quadrant pred/true', np.argmax(quad_pred.detach().cpu().numpy(), axis=1),
+                              quad.detach().cpu().numpy())
+                    if show_loss:
+                        print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
+                    if show_acc:
+                        print(f'Batch Accuracy: {100 * correct / total:.2f}%')
+                    print('')
+                if (batch_idx + 1) % save_step == 0:
+                    self.losses.append(np.average(epoch_l[-save_step:]))
+                    if batch_idx != len(self.dataloader) and (
+                            epoch + 1) % 8 == 0:  # ignore final batch since differnt size
+                        self.valpoints.append(
+                            torch.squeeze(torch.softmax(output, dim=2)[0, :, 0]).detach().cpu().numpy())
+                        self.aropoints.append(
+                            torch.squeeze(torch.softmax(output, dim=2)[1, :, 0]).detach().cpu().numpy())
+                    self.accuracy.append(correct / total)
+                    self.val_accuracy.append(self.val_accuracy[-1])
+                    total, correct = 0, 0
+                    self.scheduler.step(self.losses[-1])
+            if show_time:
+                print(f'Epoch Time: {time.time() - t:.1f}s')
+                print('')
+            if show_acc:
+                print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
+
+            if (epoch + 1) % validation_freq == 0:
+                self.optim.zero_grad()
+                self.val_accuracy.append(
+                    self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False, ret_acc=True))
+                self.optim.zero_grad()
+
+            # Trainig Loop Complete
+            if save_epochs is not None:
+                if (epoch + 1) % save_epochs == 0:
+                    if save_name is not None:
+                        epoch_name = save_name[:-3] + "epoch" + str(epoch + 1 + start_epoch) + ".pt"
+                    else:
+                        epoch_name = self.model_name[:-3] + "epoch" + str(epoch + 1 + start_epoch) + ".pt"
+
+                    torch.save(self.multitask.state_dict(), epoch_name)
+                    if self.verbose:
+                        print(f'Successfully saved model weights for epoch {epoch + 1}.')
+
+        # Training Loop Complete
+        if save:
+            torch.save(self.multitask.state_dict(), save_name if save_name is not None else self.model_name)
+            if self.verbose:
+                print(f'Successfully saved model weights.')
+        else:
+            print('You have set SAVE to False. Are you sure?')
+            name = input(
+                'If you wish to save it, please type a file name now (.pt), or enter Y to use a default file name, otherwise enter N: ')
+            if name not in ['n', 'N', ' n', ' N', 'no', 'No']:
+                if name not in ['Y', 'y']:
+                    torch.save(self.multitask.state_dict(), name)
+                else:
+                    torch.save(self.multitask.state_dict(), self.model_name)
+                if self.verbose:
+                    print(f'Successfully saved model weights as {name}')
+            else:
+                print(f'Training Compeleted. Model Not Saved. Total time: {time.time() - t_0:.0f}s')
+        return
+
+    def train_single_task(self, epochs, print_step, save_step, save=True, save_name=None, save_epochs=None,
+                show_preds=False, show_acc=True, show_loss=True, show_time=True,
+                enc_version=1, validation_freq=1, val_acc=True, val_cm=True, val_prf=False,
                 save_folder=None, start_epoch=0):
         '''
         Trains the network
@@ -406,59 +656,66 @@ class Textual_LSD_TVT():
                 aro = batch['arousal_tags'].long().to(self.device)
                 dom = batch['dominance_tags'].long().to(self.device)
                 quad = self.VA_to_quadrant(val, aro).to(self.device)
-                output, quad_pred = self.multitask(inp_data, version=enc_version)
+                output = self.multitask(inp_data, version=enc_version)
+
+                if self.use_valence:
+                    target = val
+                if self.use_arousal:
+                    target = aro
+                if self.use_dom:
+                    target = dom
+                if self.use_quad:
+                    target = quad
+
                 self.optim.zero_grad()
-                
-                valence_loss = self.valence_L(output[0], val)
-                arousal_loss = self.arousal_L(output[1], aro)
-                dominance_loss = self.dominance_L(output[2], dom) if self.use_dom == True else torch.tensor([0]).to(self.device)
-                quad_loss = self.quad_L(quad_pred, quad)
-                loss = arousal_loss + valence_loss + dominance_loss + quad_loss
+
+                loss = self.valence_L(output, target)
+
                 loss.backward()
-                #torch.nn.utils.clip_grad_norm_(self.multitask.parameters(), max_norm=1)
+                #torch.nn.utils.clip_grad_norm_(multitask.parameters(), max_norm=1)
                 self.optim.step()
                 epoch_l.append(loss.item())
                 # Calcuate Accuracy
-                total += inp_data.shape[0]
-                TOTAL += inp_data.shape[0]
-                for i in range(inp_data.shape[0]):
-                    correct += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
-                    CORRECT += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
+                # total += inp_data.shape[0]
+                # TOTAL += inp_data.shape[0]
+                # for i in range(inp_data.shape[0]):
+                #     correct += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
+                #     CORRECT += 1 if np.argmax(quad_pred[i].detach().cpu().numpy()) == quad[i] else 0
+                #
+                # if (batch_idx + 1) % print_step == 0:
+                #     if self.verbose:
+                #         print(f'Batch {batch_idx + 1} / {len(self.dataloader)}')
+                #     if show_preds:
+                #         print('VAL pred/true', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
+                #         print('ARO pred/true', output[1, :2].detach().cpu().numpy(), aro[:2].detach().cpu().numpy())
+                #         print('DOM pred/true', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
+                #         print('Quadrant pred/true', np.argmax(quad_pred.detach().cpu().numpy(), axis=1), quad.detach().cpu().numpy())
+                #     if show_loss:
+                #         print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
+                #     if show_acc:
+                #         print(f'Batch Accuracy: {100 * correct / total:.2f}%')
+                #     print('')
+                # if (batch_idx + 1) % save_step == 0:
+                #     self.losses.append(np.average(epoch_l[-save_step:]))
+                #     if batch_idx != len(self.dataloader) and (epoch + 1) % 8 == 0 : #ignore final batch since differnt size
+                #         self.valpoints.append(torch.squeeze(torch.softmax(output, dim=2)[0, :, 0]).detach().cpu().numpy())
+                #         self.aropoints.append(torch.squeeze(torch.softmax(output, dim=2)[1, :, 0]).detach().cpu().numpy())
+                #     self.accuracy.append(correct / total)
+                #     self.val_accuracy.append(self.val_accuracy[-1])
+                #     total, correct = 0, 0
+                #     self.scheduler.step(self.losses[-1])
+            # if show_time:
+            #     print(f'Epoch Time: {time.time() - t:.1f}s')
+            #     print('')
+            # if show_acc:
+            #     print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
+            #
+            # if (epoch + 1) % validation_freq == 0:
+            #     self.optim.zero_grad()
+            #     self.val_accuracy.append(self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False, ret_acc=True))
+            #     self.optim.zero_grad()
 
-                if (batch_idx + 1) % print_step == 0:
-                    if self.verbose:
-                        print(f'Batch {batch_idx + 1} / {len(self.dataloader)}')
-                    if show_preds:
-                        print('VAL pred/true', output[0, :2].detach().cpu().numpy(), val[:2].detach().cpu().numpy())
-                        print('ARO pred/true', output[1, :2].detach().cpu().numpy(), aro[:2].detach().cpu().numpy())
-                        print('DOM pred/true', output[2, :2].detach().cpu().numpy(), dom[:2].detach().cpu().numpy())
-                        print('Quadrant pred/true', np.argmax(quad_pred.detach().cpu().numpy(), axis=1), quad.detach().cpu().numpy())
-                    if show_loss:
-                        print(f'{print_step} batch average loss:', np.average(epoch_l[-print_step:]))
-                    if show_acc:
-                        print(f'Batch Accuracy: {100 * correct / total:.2f}%')
-                    print('')
-                if (batch_idx + 1) % save_step == 0:
-                    self.losses.append(np.average(epoch_l[-save_step:]))
-                    if batch_idx != len(self.dataloader) and (epoch + 1) % 8 == 0 : #ignore final batch since differnt size
-                        self.valpoints.append(torch.squeeze(torch.softmax(output, dim=2)[0, :, 0]).detach().cpu().numpy())
-                        self.aropoints.append(torch.squeeze(torch.softmax(output, dim=2)[1, :, 0]).detach().cpu().numpy())
-                    self.accuracy.append(correct / total)
-                    self.val_accuracy.append(self.val_accuracy[-1])
-                    total, correct = 0, 0
-                    self.scheduler.step(self.losses[-1])
-            if show_time:
-                print(f'Epoch Time: {time.time() - t:.1f}s')
-                print('')
-            if show_acc:
-                print(f'Epoch Accuracy: {100 * CORRECT / TOTAL:.2f}%')
 
-            if (epoch + 1) % validation_freq == 0:
-                self.optim.zero_grad()
-                self.val_accuracy.append(self.test(enc_version, val_acc, val_cm, val_prf, show_progress=False, ret_acc=True))
-                self.optim.zero_grad()
-                
-        
         # Trainig Loop Complete
             if save_epochs is not None:
                 if (epoch + 1) % save_epochs == 0:
@@ -466,11 +723,11 @@ class Textual_LSD_TVT():
                         epoch_name = save_name[:-3]+ "epoch" + str(epoch + 1 + start_epoch) + ".pt"
                     else:
                         epoch_name = self.model_name[:-3]+ "epoch" + str(epoch + 1 + start_epoch) + ".pt"
-                
+
                     torch.save(self.multitask.state_dict(), epoch_name)
                     if self.verbose:
                         print(f'Successfully saved model weights for epoch {epoch +1}.')
-       
+
         # Training Loop Complete
         if save:
             torch.save(self.multitask.state_dict(), save_name if save_name is not None else self.model_name)
