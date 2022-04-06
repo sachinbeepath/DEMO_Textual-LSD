@@ -404,7 +404,7 @@ class Textual_LSD_TVT():
         assert self.pad_idx is not None, 'Please generate or load a vocabulary before training'
 
         self.multitask = mtn.BiLSTMSentiment(emb_size,batch_size, emb_size, drp,dev,self.vocab_len,
-                                                 self.pad_idx, dom,w2v)
+                                                 self.pad_idx, dom,w2v).to(dev)
 
         self.multitask.double()
 
