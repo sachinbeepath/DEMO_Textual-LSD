@@ -36,4 +36,3 @@ trainer.plot_data(averaging_window=1)
 
 
 
-
