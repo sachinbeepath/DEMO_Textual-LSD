@@ -852,7 +852,7 @@ class Textual_LSD_TVT():
             print('Per-label precision, recall, and f-score of VA quadrant predictions: {},{},{}'.format(np.round(p_am,3),np.round(r_am,3),np.round(f_am,3)))
             print('Per-label precision, recall, and f-score valence predictions: {},{},{}'.format(np.round(p_val,3),np.round(r_val,3),np.round(f_val,3)))
             print('Per-label precision, recall, and f-score of arousal predictions: {},{},{}'.format(np.round(p_aro,3),np.round(r_aro,3),np.round(f_aro,3)))
-            print('Per-label precision, recall, and f-score of dominance predictions: {},{},{}'.format(np.round(p_dom,3),np.round(r_dom,3),np.round(f_dom,3)))
+            #print('Per-label precision, recall, and f-score of dominance predictions: {},{},{}'.format(np.round(p_dom,3),np.round(r_dom,3),np.round(f_dom,3)))
         self.multitask.train()
         if ret_acc:
             return (correct_raw + correct_am) / (2 * total)
