@@ -7,7 +7,6 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import dataloader as dl
 import multitaskNet as mtn
-import multitaskNet_v2 as mtn_v2
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim

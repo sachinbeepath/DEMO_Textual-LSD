@@ -3,8 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import transformer as trans
 from torch.autograd import Variable
-import Transformer_aladdinpersson as trans_2
-# from transformers import XLNetTokenizer, XLNetForSequenceClassification, XLNetModel, AdamW
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
