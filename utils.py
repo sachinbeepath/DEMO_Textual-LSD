@@ -793,7 +793,7 @@ class Textual_LSD_TVT():
         self.Cmat_dom = np.zeros((2,2))
 
         labels = [0,1,2,3]
-
+        self.multitask.eval()
         for batch_idx, batch in enumerate(self.validation_dataloader):
             if show_progress:
                 self.__printc('Testing:')
