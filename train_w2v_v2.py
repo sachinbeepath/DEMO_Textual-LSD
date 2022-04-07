@@ -64,8 +64,5 @@ for i, word in enumerate(words):
         weights_matrix[i] = np.random.normal(scale=0.6, size=(1,EMBEDDING_SIZE))
 
 weights_matrix = torch.tensor(weights_matrix, requires_grad=True)
-<<<<<<< HEAD
-torch.save(weights_matrix, 'w2v_window10_min10_iter10.pkl',pickle_module= pickle)
-=======
+
 torch.save(weights_matrix, 'w2v_window10_min0_iter20.pkl',pickle_module= pickle)
->>>>>>> 21878442c01f7f7c8ba02f152d5899c817cd9d59
